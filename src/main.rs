@@ -7,7 +7,7 @@ use crossterm::{
     ExecutableCommand, Result,
     event,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, SetSize, size,
-    disable_raw_mode, enable_raw_mode},
+    disable_raw_mode, enable_raw_mode, Clear, ClearType::{All}},
     event::{read, Event},
     cursor::{MoveUp, MoveDown, MoveLeft, MoveRight,
     MoveToColumn, MoveToRow, position},
@@ -15,35 +15,82 @@ use crossterm::{
 
 //const U8TOCHAR: [StyledContent<char>; 4] = [' '.on_blue(), '.'.on_green(), '@'.on_blue(), '#'.on_blue()];
 
-fn deconstruct_buffer(buf: Vec<Vec<u8>>) {
-    let u8ToChar: [StyledContent<char>; 4] = [' '.on_blue(), '.'.on_green(), '@'.on_blue(), '#'.on_blue()];
+fn reset_screen(x: u16, y: u16) {
+    execute!(
+        stdout(),
+        Clear(All),
+        MoveToColumn(x),
+        MoveToRow(y),
+    );
+}
 
-    //let mut result = String::new();
+fn display_buffer(buf: Vec<Vec<u8>>) {
+    let u8_to_char: [StyledContent<char>; 4] = [' '.on_blue(), '.'.on_green(), '@'.on_blue(), '#'.on_blue()];
+
+    reset_screen(0, 0);
     
     for row in buf.iter() {
         for c in row.iter() {
-            execute!(stdout(), Print(u8ToChar[*c as usize]));
+            execute!(stdout(), Print(u8_to_char[*c as usize]));
         }
     }
 }
 
-fn main() -> Result<()> {
-    let (cols, rows) = size()?;
+fn buffer_to_view(buf: Vec<Vec<u8>>, top_left: (usize, usize), bottom_right: (usize, usize)) -> Vec<Vec<u8>> {
+    let mut view: Vec<Vec<u8>> = Vec::new();
 
-    let mut buf: Vec<Vec<u8>> = vec![vec![0; rows.into()]; cols.into()];
+    let iter = buf[top_left.1..bottom_right.1].iter().map(|s| &s[top_left.0..bottom_right.0]);
 
-    let mut new_buf: Vec<Vec<u8>> = Vec::new(); //vec![vec![0; rows.into()]; cols.into()];
+    for row in iter {
+        let mut new_row: Vec<u8> = Vec::new();
+        for x in row {
+            new_row.push(*x);
+        }
+        view.push(new_row);
+    }
 
-    for (index, row) in buf.iter().enumerate() {
-        new_buf.push(vec![]);
-        for (idx, c) in row.iter().enumerate() {
-            if index & 2 == 0 {
-                new_buf[index].push(0);
-            } else {
-                new_buf[index].push(1);
+    return view;
+}
+
+fn get_initial_buffer() -> Vec<Vec<u8>> {
+    let mut result = vec![vec![0; 400]; 400];
+
+    for (idx1, x) in result.clone().iter().enumerate() {
+        for (idx2, y) in x.iter().enumerate() {
+            if y % 30 == 0 {
+                result[idx1][idx2] = 1;
             }
         }
     }
+
+    result[1][1] = 2;
+    result[20][20] = 2;
+    result[20][21] = 2;
+    result[21][21] = 2;
+    result[21][20] = 2;
+
+    return result;
+}
+
+fn main() -> Result<()> {
+    execute!(stdout(), SetSize(100, 300));
+
+    let (cols, rows): (u16, u16) = (100, 300);//size()?;
+
+    let mut buf: Vec<Vec<u8>> = get_initial_buffer(); //vec![vec![0; rows.into()]; cols.into()];
+
+    /*let mut new_buf: Vec<Vec<u8>> = Vec::new(); //vec![vec![0; rows.into()]; cols.into()];
+
+    for (index, row) in buf.clone().iter().enumerate() {
+        new_buf.push(Vec::new());
+        for (idx, c) in row.iter().enumerate() {
+            if index < 95 {
+                new_buf[index].push(0);
+            } else {
+                new_buf[index].push(buf[index][idx]);
+            }
+        }
+    }*/
 
     enable_raw_mode()?;
 
@@ -53,27 +100,11 @@ fn main() -> Result<()> {
         stdout(),
         SetBackgroundColor(Color::Blue),
         SetForegroundColor(Color::Red),
-        MoveToColumn(0),
-        MoveToRow(0),
-        //Print("Text herererer"),
-        //ResetColor
+        //MoveToColumn(0),
+        //MoveToRow(0),
     )?;
 
-    //execute!(stdout(), );
-
-    deconstruct_buffer(new_buf);
-
-    /*for xx in 0..cols {
-        for yy in 0..rows {
-            let (x, y) = position()?;
-            if x < 10 || y < 10 {
-                execute!(stdout(), Print("@"))?;
-            } else {
-                execute!(stdout(), Print(" "))?;
-            }
-
-        }
-    }*/
+    display_buffer(buffer_to_view(buf, (0, 0), (100, 300)));
 
     let mut x = 0;
 
