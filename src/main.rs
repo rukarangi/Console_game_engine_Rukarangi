@@ -24,14 +24,22 @@ fn reset_screen(x: u16, y: u16) {
     );
 }
 
-fn display_buffer(buf: Vec<Vec<u8>>) {
+fn display_buffer(buf: &Vec<Vec<u8>>) {
     let u8_to_char: [StyledContent<char>; 4] = [' '.on_blue(), '.'.on_green(), '@'.on_blue(), '#'.on_blue()];
 
     reset_screen(0, 0);
+
+    let mut copy = buf.clone();
+
+    copy[0][0] = 1;
+    copy[0][3] = 1;
+    copy[0][4] = 1;
+    copy[0][5] = 1;
     
-    for row in buf.iter() {
+    for row in copy.iter() {
         for c in row.iter() {
-            execute!(stdout(), Print(u8_to_char[*c as usize]));
+            //execute!(stdout(), Print(u8_to_char[*c as usize]));
+            execute!(stdout(), Print(*c));
         }
     }
 }
@@ -53,31 +61,39 @@ fn buffer_to_view(buf: Vec<Vec<u8>>, top_left: (usize, usize), bottom_right: (us
 }
 
 fn get_initial_buffer() -> Vec<Vec<u8>> {
-    let mut result = vec![vec![0; 400]; 400];
+    let mut result = vec![vec![0; 100]; 300];
 
-    for (idx1, x) in result.clone().iter().enumerate() {
+    /*for (idx1, x) in result.clone().iter().enumerate() {
         for (idx2, y) in x.iter().enumerate() {
             if y % 30 == 0 {
                 result[idx1][idx2] = 1;
             }
         }
-    }
+    }*/
 
-    result[1][1] = 2;
-    result[20][20] = 2;
-    result[20][21] = 2;
-    result[21][21] = 2;
-    result[21][20] = 2;
+    result[0][2] = 1;
+    result[0][3] = 1;
+    result[0][4] = 1;
+    result[0][5] = 1;
+    //result[20][20] = 2;
+    //result[20][21] = 2;
+    //result[21][21] = 2;
+    //result[21][20] = 2;
 
     return result;
 }
 
 fn main() -> Result<()> {
-    execute!(stdout(), SetSize(100, 300));
+    execute!(stdout(), SetSize(100, 300))?;
 
     let (cols, rows): (u16, u16) = (100, 300);//size()?;
 
-    let mut buf: Vec<Vec<u8>> = get_initial_buffer(); //vec![vec![0; rows.into()]; cols.into()];
+    let mut buf: Vec<Vec<u8>> =  vec![vec![0; cols.into()]; rows.into()]; //get_initial_buffer();
+
+    buf[0][2] = 1;
+    buf[0][3] = 1;
+    buf[0][4] = 1;
+    buf[0][5] = 1;
 
     /*let mut new_buf: Vec<Vec<u8>> = Vec::new(); //vec![vec![0; rows.into()]; cols.into()];
 
@@ -104,7 +120,11 @@ fn main() -> Result<()> {
         //MoveToRow(0),
     )?;
 
-    display_buffer(buffer_to_view(buf, (0, 0), (100, 300)));
+    display_buffer(/*buffer_to_view(*/&buf/*, (0, 0), (100, 300))*/);
+
+    //reset_screen(0,0);
+
+    //execute!(stdout(), Print(buf[0][1]), Print(buf[0][0]));
 
     let mut x = 0;
 
