@@ -34,7 +34,7 @@ fn main() -> Result<()> {
         Err(err) => panic!("{}", err),
     };
 
-    state.draw_buffer();
+    state.draw_buffer()?;
 
     let mut x: i32 = 0;
 
@@ -44,18 +44,19 @@ fn main() -> Result<()> {
 
     state.update_char_at_index((0, 0), 1);
     state.update_char_at_index((0, 1), 1);
-    state.update_char_at_index((1, 0), 1);
-    state.update_char_at_index((1, 1), 1);
+    state.update_char_at_index((0, 2), 1);
+    state.update_char_at_index((0, 3), 1);
+    state.update_char_at_index((0, 4), 1);
 
     let matrix: Vec<Vec<u8>> = vec![
         vec![1, 1],
         vec![1, 1],
     ];
 
-    //state.insert_matrix_at_index((20, 20), matrix);
+    state.insert_matrix_at_index((20, 20), matrix);
     state.update_use_buffer();
 
-    state.draw_buffer();
+    state.draw_buffer()?;
 
     match read()? {
         _ => x += 1,
@@ -116,10 +117,10 @@ impl State {
             view.push((*column).to_vec());
         }
 
-        for row in view {
-            for c in row {
-                let character: StyledContent<char> = self.style_map[c as usize];
-                execute!(stdout(), Print(character))?; // add mapping
+        for i in 0..rows {
+            for column in &view {
+                let character: StyledContent<char> = self.style_map[(column[i as usize]) as usize];
+                execute!(stdout(), Print(character))?;
             }
         }
 
@@ -136,16 +137,11 @@ impl State {
     fn insert_matrix_at_index(&mut self, location: (u16, u16), matrix: Vec<Vec<u8>>) {
         let (column, row) : (usize, usize) = (location.0.into(), location.1.into());
 
-        /*for (x, col) in matrix.iter().enumerate() {
+        for (x, col) in matrix.iter().enumerate() {
             for (y, value) in col.iter().enumerate() {
-                self.buffer[column + x][row] = *value;
+                self.buffer[column + x][row + y] = *value;
             }
-        }*/
-
-        self.buffer[column][row] = matrix[0][0];
-        //self.buffer[column][row+1] = matrix[0][1];
-        self.buffer[column+1][row] = matrix[0][0];
-        //self.buffer[column+1][row+1] = matrix[1][1];
+        }
     }
 
     fn update_use_buffer(&mut self) {
