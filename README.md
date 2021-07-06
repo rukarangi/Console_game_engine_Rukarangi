@@ -1,3 +1,5 @@
 ## Console Text Based Engine
 
-Gonna make it do things, currently does nuthin
+### Things it can do:
+* Draw to the whole window
+* Draw a lil @ that you can move
