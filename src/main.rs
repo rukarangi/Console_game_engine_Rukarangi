@@ -14,6 +14,8 @@ use crossterm::{
     MoveToColumn, MoveToRow, position, Hide, Show},
 };
 
+mod state;
+
 /*
     NOTES TO LUKE: 
         - All coords (column, row)
@@ -31,87 +33,26 @@ fn main() -> Result<()> {
         SetForegroundColor(Color::Black),
     )?;
 
-    let mut state = match State::new((80, 40)) { // columns, rows
+
+    let mut state = match state::State::new((80, 40)) { // columns, rows
         Ok(state) => state,
         Err(err) => panic!("{}", err),
     };
 
-    state.draw_buffer_init()?;
+    let mut game = Game::new(state);
 
-    let mut x: i32 = 0;
-
-    match read()? {
-        _ => x += 1,
-    }
-
-    state.update_char_at_index((0, 0), 1);
-    state.update_char_at_index((0, 1), 1);
-    state.update_char_at_index((0, 2), 1);
-    state.update_char_at_index((0, 3), 1);
-    state.update_char_at_index((0, 4), 1);
-
-    let matrix: Vec<Vec<u8>> = vec![
-        vec![1, 1],
-        vec![1, 1],
-    ];
-
-    state.insert_matrix_at_index((20, 20), matrix);
-    state.update_use_buffer();
-
-    state.draw_buffer_init()?;
-
-    match read()? {
-        _ => x += 1,
-    }
-
-    let (mut x, mut y) = (1, 0);
-    let (mut old_x, mut old_y) = (0, 0);
+    game.move_player(Direction::Left);
+    
 
     loop {
-        state.update_char_at_index((x, y), 2);
-        state.update_char_at_index((old_x, old_y), 0);
-
-        state.draw_buffer()?;
-
-        match is_event_availble() {
-            Ok(true) => {
-                match read()? {
-                    Event::Key(key_event) => {
-                        match key_event.code {
-                            KeyCode::Char(c) => {
-                                match c {
-                                    'q' => break,
-                                    _ => continue,
-                                }
-                            },
-                            KeyCode::Right => {
-                                old_x = x;
-                                old_y = y;
-                                x += 1;
-                            },
-                            KeyCode::Left => {
-                                old_x = x;
-                                old_y = y;
-                                x -= 1;
-                            },
-                            KeyCode::Up => {
-                                old_x = x;
-                                old_y = y;
-                                y -= 1;
-                            },
-                            KeyCode::Down => {
-                                old_x = x;
-                                old_y = y;
-                                y += 1;
-                            },
-                            _ => continue,
-                        }
-                    },
-                    _ => continue,
-                }
-            },
-            _ => continue,
+        if !game.running {
+            break;
         }
+
+        game.handle_event()?;
+
+        game.state.draw_buffer()?;
+
     }
 
     disable_raw_mode()?;
@@ -123,125 +64,126 @@ fn is_event_availble() -> Result<bool> {
     poll(Duration::from_secs(0))
 }
 
-fn get_sub_view(buffer: &Vec<Vec<u8>>, location: (u16, u16), width: usize, height: usize) -> Vec<Vec<u8>> {
-    let (column, row) : (usize, usize) = (location.0.into(), location.1.into());
-    
-    let view: Vec<Vec<u8>> = buffer[column..(column + width)]
-                            .iter()
-                            .map(|s| s[row..(row + height)].to_vec())
-                            .collect();
-
-    return view;
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
 }
 
-struct State {
-    buffer: Vec<Vec<u8>>,
-    alternate_buffer: Vec<Vec<u8>>,
-    dimensions: (u16, u16), // columns, rows
-    style_map: [StyledContent<char>; 4],
+struct Game {
+    state: state::State,
+    running: bool,
+    borders: Vec<((u16, u16), (u16, u16))>,
+    gravity: u16,
+    time: u32,
+    player: (u16, u16),
 }
 
-impl State {
-    fn new(dimensions: (u16, u16)) -> Result<State> {
-        execute!(
-            stdout(),
-            SetSize(dimensions.0, dimensions.1), // columns, rows
-            Clear(All),
-            MoveToColumn(0),
-            MoveToRow(0),
-        )?;
+impl Game {
+    fn new(state_init: state::State) -> Game {
+        let mut state = state_init;
+        
+        let running = true;
+        let borders = vec![
+            ((1, 1), (state.dimensions.0/* - 1*/, 1)),
+            ((1, 1), (1, state.dimensions.1/* - 1*/)),
+            ((state.dimensions.0/* - 1*/, 1), (state.dimensions.0/* - 1*/, state.dimensions.1/* -1)*/)),
+            ((1, state.dimensions.1/* - 1*/), (state.dimensions.0/* - 1*/, state.dimensions.1/* -1)*/)),
+        ];
 
-        let buffer = vec![vec![0; 40]; 80]; 
-        // vec of colums, with rows number of elements
-        let alternate_buffer = buffer.clone();
-        let style_map = [' '.on_blue(), '.'.on_green(), '@'.on_blue(), '#'.on_blue()];
+        
 
-        Ok(State {
-            buffer,
-            alternate_buffer,
-            dimensions,
-            style_map,
-        })
+        let gravity = 1;
+        let time = 0;
+
+        let player = (21, 20);
+
+        return Game {
+            state,
+            running,
+            borders,
+            gravity,
+            time,
+            player,
+        };
     }
 
-    fn draw_buffer_init(&mut self) -> Result<()> {
-        execute!(
-            stdout(),
-            Clear(All),
-            MoveToColumn(0),
-            MoveToRow(0),
-        )?;
-        
-        let (columns, rows) : (usize, usize) = (self.dimensions.0.into(), self.dimensions.1.into());
+    fn draw_borders(&mut self) {
+        for border in &self.borders {
+            let length: usize = (border.1.0 - border.0.0).into();
+            let height: usize = (border.1.1 - border.0.1).into();
+            let border_real: Vec<Vec<u8>> = vec![vec![3; height]; length];
 
-        let mut view = get_sub_view(&self.alternate_buffer, (0, 0), columns, rows);
-
-        for i in 0..rows {
-            for column in &view {
-                let character: StyledContent<char> = self.style_map[(column[i as usize]) as usize];
-                execute!(stdout(), Print(character))?;
-            }
+            self.state.insert_matrix_at_index(border.0, border_real);
         }
-
-        Ok(())
     }
 
-    fn draw_buffer(&mut self) -> Result<()> {
-        // get current view window
-        let (columns, rows) : (usize, usize) = (self.dimensions.0.into(), self.dimensions.1.into());
-
-        let mut view: Vec<Vec<u8>> = get_sub_view(&self.alternate_buffer, (0, 0), columns, rows);
-        let old_buffer: Vec<Vec<u8>> = get_sub_view(&self.buffer, (0, 0), columns, rows);
-        
-        // grab view size parts of current and old buffer
-        // compare and print differnces
-        for (x, column) in view.clone().iter().enumerate() {
-            for (y, row) in column.iter().enumerate() {
-                if *row == old_buffer[x][y] {
-                    continue;
-                } else {
-                    let character: StyledContent<char> = self.style_map[old_buffer[x][y] as usize];
-                    execute!(
-                        stdout(),
-                        MoveToColumn(x as u16),
-                        MoveToRow(y as u16),
-                        Print(character)
-                    )?;
+    fn handle_event(&mut self) -> Result<()>{
+        match is_event_availble() {
+            Ok(true) => {
+                match read()? {
+                    Event::Key(key_event) => {
+                        match key_event.code {
+                            KeyCode::Char(c) => {
+                                match c {
+                                    'q' => self.running = false,
+                                    _ => return Ok(()),
+                                }
+                            },
+                            KeyCode::Right => {
+                                self.move_player(Direction::Right);
+                            },
+                            KeyCode::Left => {
+                                self.move_player(Direction::Left);
+                            },
+                            KeyCode::Up => {
+                                self.move_player(Direction::Up);
+                            },
+                            KeyCode::Down => {
+                                self.move_player(Direction::Down);
+                            },
+                            _ => return Ok(()),
+                        }
+                    },
+                    _ => return Ok(()),
                 }
-            }
+            },
+            _ => return Ok(()),
         }
-
-        // update view buffer
-
-        self.alternate_buffer = self.buffer.clone();
-
-        execute!(
-            stdout(),
-            MoveToColumn(0),
-            MoveToRow(0)
-        )?;
 
         Ok(())
     }
+    
+    fn move_player(&mut self, direction: Direction) {
+        let proposed_pos: (u16, u16) = match direction {
+            Direction::Up => {
+                (self.player.0, self.player.1 - 1)
+            },
+            Direction::Down => {
+                (self.player.0, self.player.1 + 1)
+            },
+            Direction::Left => {
+                (self.player.0 - 1, self.player.1)
+            },
+            Direction::Right => {
+                (self.player.0 + 1, self.player.1)
+            },
+        };
 
-    fn update_char_at_index(&mut self, location: (u16, u16), value: u8) {
-        // use: (column, row) value
-        let (column, row) : (usize, usize) = (location.0.into(), location.1.into());
-
-        self.buffer[column][row] = value;
-    }
-
-    fn insert_matrix_at_index(&mut self, location: (u16, u16), matrix: Vec<Vec<u8>>) {
-        let (column, row) : (usize, usize) = (location.0.into(), location.1.into());
-
-        for (x, col) in matrix.iter().enumerate() {
-            for (y, value) in col.iter().enumerate() {
-                self.buffer[column + x][row + y] = *value;
+        for border in &self.borders {
+            if (proposed_pos.0 >= border.0.0 && // is right of top left
+                proposed_pos.0 <= border.1.0 && // is left of bottom right
+                proposed_pos.1 >= border.0.1 && // is down of top left
+                proposed_pos.1 <= border.1.1) { // is up of bottom right
+                return; // is colliding dont move
             }
         }
+
+        self.state.update_char_at_index(proposed_pos, 2);
+        self.state.update_char_at_index(self.player, 0); // will overwrite
+
+        self.player = proposed_pos;
     }
 
-    fn update_use_buffer(&mut self) {
-        self.alternate_buffer = self.buffer.clone();
-    }
 }

@@ -138,3 +138,90 @@ fn main1() -> Result<()> {
 
     execute!(stdout(), ResetColor, LeaveAlternateScreen)
 }
+
+/*
+    let mut state = match state::State::new((80, 40)) { // columns, rows
+        Ok(state) => state,
+        Err(err) => panic!("{}", err),
+    };
+
+    state.draw_buffer_init()?;
+
+    let mut x: i32 = 0;
+
+    match read()? {
+        _ => x += 1,
+    }
+
+    state.update_char_at_index((0, 0), 1);
+    state.update_char_at_index((0, 1), 1);
+    state.update_char_at_index((0, 2), 1);
+    state.update_char_at_index((0, 3), 1);
+    state.update_char_at_index((0, 4), 1);
+
+    let matrix: Vec<Vec<u8>> = vec![
+        vec![1, 1],
+        vec![1, 1],
+        vec![1, 0, 2, 3],
+    ];
+
+    state.insert_matrix_at_index((20, 20), matrix);
+    state.update_use_buffer();
+
+    state.draw_buffer_init()?;
+
+    match read()? {
+        _ => x += 1,
+    }
+
+    let (mut x, mut y) = (1, 0);
+    let (mut old_x, mut old_y) = (0, 0);
+
+    loop {
+        state.update_char_at_index((x, y), 2);
+        state.update_char_at_index((old_x, old_y), 0);
+
+        state.draw_buffer()?;
+
+        match is_event_availble() {
+            Ok(true) => {
+                match read()? {
+                    Event::Key(key_event) => {
+                        match key_event.code {
+                            KeyCode::Char(c) => {
+                                match c {
+                                    'q' => break,
+                                    _ => continue,
+                                }
+                            },
+                            KeyCode::Right => {
+                                old_x = x;
+                                old_y = y;
+                                x += 1;
+                            },
+                            KeyCode::Left => {
+                                old_x = x;
+                                old_y = y;
+                                x -= 1;
+                            },
+                            KeyCode::Up => {
+                                old_x = x;
+                                old_y = y;
+                                y -= 1;
+                            },
+                            KeyCode::Down => {
+                                old_x = x;
+                                old_y = y;
+                                y += 1;
+                            },
+                            _ => continue,
+                        }
+                    },
+                    _ => continue,
+                }
+            },
+            _ => continue,
+        }
+    }
+
+    */
