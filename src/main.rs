@@ -22,6 +22,7 @@ mod state;
         - Bufs and Vec of columns, each rows number long
 
 */
+
 fn main() -> Result<()> {
     enable_raw_mode()?;
 
@@ -42,7 +43,7 @@ fn main() -> Result<()> {
     let mut game = Game::new(state);
 
     game.move_player(Direction::Left);
-    
+    game.draw_borders();
 
     loop {
         if !game.running {
@@ -74,7 +75,7 @@ enum Direction {
 struct Game {
     state: state::State,
     running: bool,
-    borders: Vec<((u16, u16), (u16, u16))>,
+    borders: Vec<((u16, u16), (u16, u16), u8)>,
     gravity: u16,
     time: u32,
     player: (u16, u16),
@@ -86,18 +87,19 @@ impl Game {
         
         let running = true;
         let borders = vec![
-            ((1, 1), (state.dimensions.0/* - 1*/, 1)),
-            ((1, 1), (1, state.dimensions.1/* - 1*/)),
-            ((state.dimensions.0/* - 1*/, 1), (state.dimensions.0/* - 1*/, state.dimensions.1/* -1)*/)),
-            ((1, state.dimensions.1/* - 1*/), (state.dimensions.0/* - 1*/, state.dimensions.1/* -1)*/)),
+            ((1, 1), (state.dimensions.0, 1), 3), // (80, 1)
+            ((1, 1), (1, state.dimensions.1), 3), // (1, 40)
+            // (80, 1) (80, 40) = (1, 38)
+            ((state.dimensions.0, 1), (state.dimensions.0, state.dimensions.1), 3),
+            // (1, 40) (80, 40) = (78, 1)
+            ((1, state.dimensions.1), (state.dimensions.0, state.dimensions.1), 3),
+            ((20, 20), (30, 30), 3),
         ];
-
-        
 
         let gravity = 1;
         let time = 0;
 
-        let player = (21, 20);
+        let player = (5, 5);
 
         return Game {
             state,
@@ -110,12 +112,30 @@ impl Game {
     }
 
     fn draw_borders(&mut self) {
-        for border in &self.borders {
-            let length: usize = (border.1.0 - border.0.0).into();
-            let height: usize = (border.1.1 - border.0.1).into();
-            let border_real: Vec<Vec<u8>> = vec![vec![3; height]; length];
+        for border in &self.borders { // 80     -   1    = 79
+            let mut length: usize;// = (border.1.0 - border.0.0 - 1).into();
+            if border.1.0 == border.0.0 {
+                length = 1;
+            } else {
+                length = (border.1.0 - border.0.0 + 1 ).into();
+            }
+            let mut height: usize;// = (border.1.1 - border.0.1 - 1).into();
+            if border.1.1 == border.0.1 {
+                height = 1;
+            } else {
+                height = (border.1.1 - border.0.1 + 1 ).into();
+            }
 
-            self.state.insert_matrix_at_index(border.0, border_real);
+            let mut start = border.0;
+            /*if border.0.0 >= self.state.dimensions.0 {
+                start.0 -= 0;
+            } else if border.0.1 >= self.state.dimensions.1 {
+                start.1 -= 0;
+            }*/
+
+            let border_real: Vec<Vec<u8>> = vec![vec![border.2; height]; length];
+
+            self.state.insert_matrix_at_index(start, border_real);
         }
     }
 

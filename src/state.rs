@@ -42,7 +42,7 @@ impl State {
             MoveToRow(0),
         )?;
 
-        let buffer = vec![vec![0; 40]; 80]; 
+        let buffer = vec![vec![0; 100]; 100]; 
         // vec of colums, with rows number of elements
         let alternate_buffer = buffer.clone();
         let style_map = [
@@ -87,7 +87,7 @@ impl State {
 
     pub fn draw_buffer(&mut self) -> Result<()> {
         // get current view window
-        let (columns, rows) : (usize, usize) = (self.dimensions.0.into(), self.dimensions.1.into());
+        let (columns, rows) : (usize, usize) = ((self.dimensions.0 + 1).into(), (self.dimensions.1 + 1).into());
 
         let mut view: Vec<Vec<u8>> = get_sub_view(&self.alternate_buffer, (0, 0), columns, rows);
         let old_buffer: Vec<Vec<u8>> = get_sub_view(&self.buffer, (0, 0), columns, rows);
