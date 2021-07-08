@@ -46,9 +46,7 @@ fn main() -> Result<()> {
     game.draw_borders();
 
     let field: Vec<Vec<u8>> = vec![
-        vec![7, 7, 7],
-        vec![7, 7, 7],
-        vec![7, 7, 7, 7],
+        vec![7; 20]; 20
     ];
 
     game.state.insert_matrix_at_index((35, 15), field);
