@@ -29,7 +29,7 @@ pub struct State {
     pub buffer: Vec<Vec<u8>>,
     pub alternate_buffer: Vec<Vec<u8>>,
     pub dimensions: (u16, u16), // columns, rows
-    pub style_map: [StyledContent<char>; 7],
+    pub style_map: [StyledContent<char>; 21],
 }
 
 impl State {
@@ -46,13 +46,27 @@ impl State {
         // vec of colums, with rows number of elements
         let alternate_buffer = buffer.clone();
         let style_map = [
-            ' '.on_blue(),  // 0
-            '.'.on_green(), // 1
-            '@'.on_blue(),  // 2
-            '#'.on_blue(),  // 3
-            '|'.on_green(), // 4
-            ' '.on_green(), // 5
-            '_'.on_green(), // 6
+            ' '.on_blue(),          // 0
+            '.'.on_green(),         // 1
+            '@'.on_blue(),          // 2
+            '#'.on_blue(),          // 3
+            ' '.on(Color::Blue),    // 4
+            ' '.on(Color::Grey),    // 5
+            ' '.on(Color::Red),     // 6
+            ' '.on(Color::Green),   // 7
+            ' '.on(Color::Yellow),  // 8
+            ' '.on(Color::Magenta), // 9
+            '@'.on(Color::Blue),   // 10
+            '.'.on(Color::Blue),    // 11
+            '_'.on(Color::Grey),    // 12
+            '#'.on(Color::Red),     // 13
+            '@'.on(Color::Blue),    // 14
+            '@'.on(Color::Grey),    // 15
+            '@'.on(Color::Red),     // 16
+            '@'.on(Color::Green),   // 17
+            '@'.on(Color::Yellow),  // 18
+            '@'.on(Color::Magenta), // 19
+            '@'.on(Color::White),   // 20
         ];
 
         Ok(State {

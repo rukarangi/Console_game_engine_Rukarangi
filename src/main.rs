@@ -45,6 +45,14 @@ fn main() -> Result<()> {
     game.move_player(Direction::Left);
     game.draw_borders();
 
+    let field: Vec<Vec<u8>> = vec![
+        vec![7, 7, 7],
+        vec![7, 7, 7],
+        vec![7, 7, 7, 7],
+    ];
+
+    game.state.insert_matrix_at_index((35, 15), field);
+
     loop {
         if !game.running {
             break;
@@ -112,14 +120,14 @@ impl Game {
     }
 
     fn draw_borders(&mut self) {
-        for border in &self.borders { // 80     -   1    = 79
-            let mut length: usize;// = (border.1.0 - border.0.0 - 1).into();
+        for border in &self.borders {
+            let mut length: usize;
             if border.1.0 == border.0.0 {
                 length = 1;
             } else {
                 length = (border.1.0 - border.0.0 + 1 ).into();
             }
-            let mut height: usize;// = (border.1.1 - border.0.1 - 1).into();
+            let mut height: usize;
             if border.1.1 == border.0.1 {
                 height = 1;
             } else {
@@ -127,11 +135,6 @@ impl Game {
             }
 
             let mut start = border.0;
-            /*if border.0.0 >= self.state.dimensions.0 {
-                start.0 -= 0;
-            } else if border.0.1 >= self.state.dimensions.1 {
-                start.1 -= 0;
-            }*/
 
             let border_real: Vec<Vec<u8>> = vec![vec![border.2; height]; length];
 
@@ -200,8 +203,20 @@ impl Game {
             }
         }
 
-        self.state.update_char_at_index(proposed_pos, 2);
-        self.state.update_char_at_index(self.player, 0); // will overwrite
+        let mut last_color: u8;
+
+        if self.state.alternate_buffer[self.player.0 as usize][self.player.1 as usize] < 10 {
+            last_color = 0;
+        } else {
+            last_color = self.state.alternate_buffer[self.player.0 as usize][self.player.1 as usize] - 10; // fix bug
+
+        }
+
+        let proper_color = self.state.alternate_buffer[proposed_pos.0 as usize][proposed_pos.1 as usize] + 10;
+
+        self.state.update_char_at_index(proposed_pos, proper_color);
+        
+        self.state.update_char_at_index(self.player, last_color); // will overwrite
 
         self.player = proposed_pos;
     }
