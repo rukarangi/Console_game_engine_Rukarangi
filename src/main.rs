@@ -16,6 +16,8 @@ use crossterm::{
 
 mod state;
 
+mod state_wip;
+
 /*
     NOTES TO LUKE: 
         - All coords (column, row)
@@ -64,7 +66,20 @@ fn main() -> Result<()> {
 
     disable_raw_mode()?;
 
-    execute!(stdout(), ResetColor, LeaveAlternateScreen, Show)
+    execute!(stdout(), ResetColor, LeaveAlternateScreen, Show)?;
+
+    println!("Now testing new system\n");
+
+    let mut test_state = state_wip::GameState::new();
+
+    test_state.print_it();
+
+    test_state.test_alloc();
+    test_state.print_it();
+    test_state.test_alloc();
+    test_state.print_it();
+
+    Ok(())
 }
 
 fn is_event_availble() -> Result<bool> {
