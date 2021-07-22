@@ -13,9 +13,9 @@ impl GenerationalIndex {
 }
 
 #[derive(Copy, Clone, Debug)]
-struct AllocatorEntry {
+pub struct AllocatorEntry {
     is_live: bool,
-    generation: u64,
+    pub generation: u64,
 }
 
 
@@ -40,6 +40,26 @@ impl GenerationalIndexAllocator {
             entries,
             free,
         }
+    }
+
+    pub fn expose_entries(&self) -> &Vec<AllocatorEntry> {
+        &self.entries
+    }
+
+    pub fn get_vec(&self) -> Vec<GenerationalIndex> {
+        let mut result: Vec<GenerationalIndex> = Vec::new();
+
+        for (index, generation) in self.entries.iter().enumerate() {
+            let gen_index = GenerationalIndex {
+                index,
+                generation: generation.generation,
+            };
+            if generation.is_live {
+                result.push(gen_index);
+            }
+        }
+
+        return result;
     }
 
     pub fn allocate(&mut self) -> GenerationalIndex {
@@ -96,6 +116,7 @@ struct ArrayEntry<T> {
 
 #[derive(Clone, Debug)]
 pub struct GenerationalIndexArray<T>(Vec<Option<ArrayEntry<T>>>);
+// need to build iter for T
 
 impl<T> GenerationalIndexArray<T> {
     pub fn new() -> GenerationalIndexArray<T> {
@@ -104,6 +125,10 @@ impl<T> GenerationalIndexArray<T> {
         )
     }
 
+    pub fn get_len(&self) -> usize {
+        self.0.len()
+    }
+     
     pub fn set(&mut self, index: GenerationalIndex, value: T) {
         let entry = ArrayEntry::<T> {
             value,
@@ -111,7 +136,10 @@ impl<T> GenerationalIndexArray<T> {
         };
         
         if index.index >= self.0.len() {
-            self.0.push(None);
+            let difference = index.index - self.0.len();
+            for i in 0..(difference + 1) {
+                self.0.push(None);
+            }
         }
 
         self.0[index.index] = Some(entry);
@@ -144,7 +172,7 @@ impl<T> GenerationalIndexArray<T> {
             return None;
         }
 
-        let mut entry = match &mut self.0[index.index] {
+        let entry = match &mut self.0[index.index] {
             Some(entry) => entry,
             None => return None,
         };

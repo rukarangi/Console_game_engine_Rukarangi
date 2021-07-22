@@ -25,15 +25,15 @@ pub fn get_sub_view(buffer: &Vec<Vec<u8>>, location: (u16, u16), width: usize, h
     return view;
 }
 
-pub struct State {
+pub struct Renderer {
     pub buffer: Vec<Vec<u8>>,
     pub alternate_buffer: Vec<Vec<u8>>,
     pub dimensions: (u16, u16), // columns, rows
     pub style_map: [StyledContent<char>; 21],
 }
 
-impl State {
-    pub fn new(dimensions: (u16, u16)) -> Result<State> {
+impl Renderer {
+    pub fn new(dimensions: (u16, u16)) -> Result<Renderer> {
         execute!(
             stdout(),
             SetSize(dimensions.0, dimensions.1), // columns, rows
@@ -69,7 +69,7 @@ impl State {
             '@'.on(Color::White),   // 20
         ];
 
-        Ok(State {
+        Ok(Renderer {
             buffer,
             alternate_buffer,
             dimensions,

@@ -1,7 +1,8 @@
 mod generations;
 
-type Entity = generations::GenerationalIndex;
+pub type Entity = generations::GenerationalIndex;
 
+// Vec<Option<ArrayEntry<T>>>
 type EntityMap<T> = generations::GenerationalIndexArray<T>;
 
 pub struct GameState {
@@ -35,8 +36,12 @@ impl GameState {
 
     pub fn test_dealloc(&mut self, entity: Entity) {
         let success = self.entity_allocator.deallocate(entity);
+        let index = entity.index();
 
-        self.render_components.set(entity, 0);
+        /*match self.render_components.get(entity) {
+            Some(_) => self.render_components.0[index] = None,
+            None => return;
+        };*/
     }
 
     pub fn print_it(&self) {

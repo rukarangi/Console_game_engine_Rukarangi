@@ -37,7 +37,7 @@ fn main() -> Result<()> {
     )?;
 
 
-    let mut state = match state::State::new((80, 40)) { // columns, rows
+    let mut state = match state::Renderer::new((80, 40)) { // columns, rows
         Ok(state) => state,
         Err(err) => panic!("{}", err),
     };
@@ -78,6 +78,15 @@ fn main() -> Result<()> {
     test_state.print_it();
     test_state.test_alloc();
     test_state.print_it();
+    let test_entry = state_wip::Entity {
+        index: 0,
+        generation: 1,
+    };
+
+    test_state.test_dealloc(test_entry);
+    test_state.print_it();
+    test_state.test_alloc();
+    test_state.print_it();
 
     Ok(())
 }
@@ -94,7 +103,7 @@ enum Direction {
 }
 
 struct Game {
-    state: state::State,
+    state: state::Renderer,
     running: bool,
     borders: Vec<((u16, u16), (u16, u16), u8)>,
     gravity: u16,
@@ -103,7 +112,7 @@ struct Game {
 }
 
 impl Game {
-    fn new(state_init: state::State) -> Game {
+    fn new(state_init: state::Renderer) -> Game {
         let mut state = state_init;
         
         let running = true;
