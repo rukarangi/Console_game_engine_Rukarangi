@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 cursive = "*"
 crossterm = "0.20.0"
+rand = "0.8.0"

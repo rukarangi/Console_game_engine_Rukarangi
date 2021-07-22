@@ -1,4 +1,5 @@
 use std::time::Duration;
+use std::io::{stdout, Write};
 
 use crossterm::{
     execute,
@@ -26,6 +27,8 @@ use crate::components::CollisionComponent;
 use crate::components::RenderComponent;
 use crate::components::MovementComponent;
 use crate::components::Direction;
+mod map_generation;
+use crate::map_generation::MapGenerator;
 
 type EntityMap<T> = generations::GenerationalIndexArray<T>;
 pub type Entity = generations::GenerationalIndex;
@@ -41,8 +44,8 @@ ok move working, now fields things that arent collider but visible
 
 fn main() -> Result<()> {
     let style_map: StyleMap = vec![ // add 5 for player
-        '*'.on_red(),           // 0  test
-        '#'.on_blue(),          // 1
+        '_'.on_black(),         // 0  test
+        '#'.on_blue(),          // 1  test
         ' '.on(Color::Grey),    // 2
         ' '.on(Color::Blue),    // 3  default backgroud for now
         ' '.on(Color::Red),     // 4
@@ -55,8 +58,8 @@ fn main() -> Result<()> {
         '@'.on(Color::Yellow),  // 11
     ];
 
-    let dimensions: Dimemsion = (101, 101);
-    let view_port: Dimemsion = (80, 40);
+    let dimensions: Dimemsion = (201, 101);
+    let view_port: Dimemsion = (150, 60);
 
     let mut game: GameState = GameState::new(dimensions, view_port, style_map);
 
@@ -76,6 +79,25 @@ fn main() -> Result<()> {
         }
     }
 
+    game.map_generator.randomize(0.5);
+    game.map_generator.run_generation();
+    game.map_generator.run_generation();
+    game.map_generator.run_generation();
+    
+    loop {
+        game.renderer.insert_matrix((0, 0), game.map_generator.current_generation.clone());
+    
+        game.renderer.render();
+
+        if is_event_availble()? {
+            match read()? {
+                event => break,
+                _ => continue,
+            }
+        }
+    }
+    //println!("{:?}", game.map_generator.current_generation);
+
     Renderer::reset_term()?;
 
     Ok(())
@@ -87,6 +109,7 @@ struct GameState {
     collision_buffer: Buffer,
     running: bool,
     empty_buffer: Buffer,
+    map_generator: MapGenerator,
 
     // ECS
     entity_allocator: GenerationalIndexAllocator,
@@ -108,6 +131,7 @@ impl GameState {
         };
         let collision_buffer = renderer.input_buffer.clone();
         let empty_buffer = renderer.input_buffer.clone();
+        let map_generator = MapGenerator::new(dimensions);
         
         // ECS
         let entity_allocator = generations::GenerationalIndexAllocator::new(1);
@@ -120,6 +144,7 @@ impl GameState {
             collision_buffer,
             running: true,
             empty_buffer,
+            map_generator,
             entity_allocator,
             render_components,
             movement_components,
@@ -246,17 +271,18 @@ impl GameState {
                 // Handling Begins
 
                 // Update to potential new position
-                match self.render_components.get_mut(gen_index) {
+                match self.render_components.get(gen_index) {
                     Some(render_comp) => {
-                        comp.top_left = render_comp.position_tl;
-                        comp.bottom_right = render_comp.position_br;
+                        //comp.top_left = render_comp.position_tl;
+                        //comp.bottom_right = render_comp.position_br;
+                        comp.matrix = get_matrix(render_comp.position_tl, render_comp.position_br, 1);
                     },
                     None => (),
                 }
 
                 // Build and insert into collision buffer
-                let matrix = get_matrix(comp.top_left, comp.bottom_right, 1);
-                insert_matrix(&mut self.collision_buffer, comp.top_left, matrix);
+                //let matrix = get_matrix(comp.top_left, comp.bottom_right, 1);
+                insert_matrix(&mut self.collision_buffer, comp.position, comp.matrix.clone());
             //}
         }
     }
@@ -266,7 +292,7 @@ impl GameState {
 
         let render_comp = RenderComponent::new(8, position, position, 0);
         let movement_comp = MovementComponent::new(position);
-        let collision_comp = CollisionComponent::new(position, position);
+        let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1));
 
         self.render_components.set(player_entity, render_comp);
         self.movement_components.set(player_entity, movement_comp);
@@ -276,10 +302,10 @@ impl GameState {
     }
 
     fn init_borders(&mut self) {
-        let top = ((1, 1), (self.renderer.dimensions.0, 1));
-        let left = ((1, 1), (1, self.renderer.dimensions.1));
-        let right = ((self.renderer.dimensions.0, 1), (self.renderer.dimensions.0, self.renderer.dimensions.1));
-        let bottom = ((1, self.renderer.dimensions.1), (self.renderer.dimensions.0, self.renderer.dimensions.1));
+        let top = ((1, 1), (self.renderer.view_port.0, 1));
+        let left = ((1, 1), (1, self.renderer.view_port.1));
+        let right = ((self.renderer.view_port.0, 1), (self.renderer.view_port.0, self.renderer.view_port.1));
+        let bottom = ((1, self.renderer.view_port.1), (self.renderer.view_port.0, self.renderer.view_port.1));
         let test = ((20, 20), (30, 30));
 
         let borders = vec![top, bottom, left, right, test];
@@ -288,7 +314,7 @@ impl GameState {
         for border in borders {
             let entity = self.entity_allocator.allocate();
             
-            let collision_comp = CollisionComponent::new(border.0, border.1);
+            let collision_comp = CollisionComponent::new(border.0, get_matrix(border.0, border.1, 1));
             let render_comp = RenderComponent::new(1, border.0, border.1, 0);
             
             self.collision_components.set(entity, collision_comp);
@@ -308,20 +334,21 @@ impl GameState {
 
     fn init_background(&mut self) {
         let entity = self.entity_allocator.allocate();
+        let dimensions = self.renderer.dimensions;
 
-        let render_comp = RenderComponent::new(3, (0, 0), (80, 40), 2);
+        let render_comp = RenderComponent::new(3, (0, 0), (dimensions.0, dimensions.1), 2);
         self.render_components.set(entity, render_comp);
     }
 }
 
 fn get_matrix(tl: (u16, u16), br: (u16, u16), value: u8) -> Buffer {
-    let mut length: usize;
+    let length: usize;
     if br.0 == tl.0 {
         length = 1;
     } else {
         length = (br.0 - tl.0 + 1 ).into();
     }
-    let mut height: usize;
+    let height: usize;
     if br.1 == tl.1 {
         height = 1;
     } else {

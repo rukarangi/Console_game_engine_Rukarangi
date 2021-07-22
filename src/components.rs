@@ -2,15 +2,16 @@ use std::default::Default;
 
 #[derive(Clone, Debug)]
 pub struct CollisionComponent {
-    pub top_left: (u16, u16),
-    pub bottom_right: (u16, u16),
+    pub position: (u16, u16),
+    //pub bottom_right: (u16, u16),
+    pub matrix: Vec<Vec<u8>>,
 }
 
 impl CollisionComponent {
-    pub fn new(top_left: (u16, u16), bottom_right: (u16, u16)) -> CollisionComponent {
+    pub fn new(position: (u16, u16), matrix: Vec<Vec<u8>>) -> CollisionComponent {
         CollisionComponent { 
-            top_left,
-            bottom_right,
+            position,
+            matrix,
         }
     }   
 }
