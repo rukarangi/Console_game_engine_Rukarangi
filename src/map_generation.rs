@@ -7,6 +7,12 @@ pub struct MapGenerator {
     dimensions: (usize, usize),
 }
 
+/*
+NOTES:
+ * fix weird dead spot
+ * remember to take away extra 2s - investigate
+*/
+
 impl MapGenerator {
     pub fn new(dimensions: (u16, u16)) -> MapGenerator {
         MapGenerator {
