@@ -6,5 +6,8 @@
 * Do border and custom area collisions, and draw them!
 * It uses a ECS type thing - WOW!
 
+### Recommended Font:
+https://strlen.com/square/
+
 ### Example:
 ![Example Screen](/images/screenshot_ofterminalengine.png)
