@@ -1,6 +1,38 @@
 use std::default::Default;
 
 #[derive(Clone, Debug)]
+pub struct EnergyComponent {
+    pub energy: u8,
+}
+
+impl EnergyComponent {
+    pub fn new(energy: u8) -> EnergyComponent {
+        EnergyComponent { 
+            energy,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum AIType {
+    SimpleDown,
+    SimpleLeft,
+}
+
+#[derive(Clone, Debug)]
+pub struct EnemyAIComponent {
+    pub ai_type: AIType,
+}
+
+impl EnemyAIComponent {
+    pub fn new(ai_type: AIType) -> EnemyAIComponent {
+        EnemyAIComponent {
+            ai_type,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct CollisionComponent {
     pub position: (u16, u16),
     //pub bottom_right: (u16, u16),
@@ -19,6 +51,7 @@ impl CollisionComponent {
 #[derive(Clone, Debug)]
 pub struct RenderComponent {
     pub character: u8,
+    pub backgroud: u8,
     pub position_tl: (u16, u16),
     pub position_br: (u16, u16),
     pub visible: bool,
@@ -26,9 +59,10 @@ pub struct RenderComponent {
 }
 
 impl RenderComponent {
-    pub fn new(character: u8, position_tl: (u16, u16), position_br: (u16, u16), layer: u16) -> RenderComponent {
+    pub fn new(character: u8, backgroud: u8, position_tl: (u16, u16), position_br: (u16, u16), layer: u16) -> RenderComponent {
         RenderComponent {
             character,
+            backgroud,
             position_tl,
             position_br,
             visible: true,

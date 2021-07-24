@@ -9,8 +9,7 @@ pub struct MapGenerator {
 
 /*
 NOTES:
- * fix weird dead spot
- * remember to take away extra 2s - investigate
+ * add other structures
 */
 
 impl MapGenerator {
@@ -59,13 +58,13 @@ impl MapGenerator {
             for (y, val) in col.iter().enumerate() {
                 match val {
                     0 => {
-                        result[x][y] = 2;
+                        result[x][y] = 1;
                     },
                     1 => {
-                        result[x][y] = 1;
+                        result[x][y] = 3;
                     },
                     _ => {
-                        result[x][y] = 1;
+                        result[x][y] = 3;
                     },
                 }
             }

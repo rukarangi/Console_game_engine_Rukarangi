@@ -18,17 +18,11 @@ mod generations;
 use crate::generations::GenerationalIndex;
 use crate::generations::GenerationalIndexAllocator;
 mod renderer;
-use crate::renderer::Dimemsion;
-use crate::renderer::Renderer;
-use crate::renderer::StyleMap;
-use crate::renderer::Buffer;
+use crate::renderer::*;
 mod components;
-use crate::components::CollisionComponent;
-use crate::components::RenderComponent;
-use crate::components::MovementComponent;
-use crate::components::Direction;
+use crate::components::*;
 mod map_generation;
-use crate::map_generation::MapGenerator;
+use crate::map_generation::*;
 
 type EntityMap<T> = generations::GenerationalIndexArray<T>;
 pub type Entity = generations::GenerationalIndex;
@@ -43,7 +37,7 @@ ok move working, now fields things that arent collider but visible
 */
 
 fn main() -> Result<()> {
-    let style_map: StyleMap = vec![ // add 5 for player
+    /*let style_map: StyleMap = vec![ // add 5 for player
         '_'.on_black(),         // 0  test
         '#'.on_blue(),          // 1  test
         ' '.on(Color::Grey),    // 2
@@ -56,49 +50,41 @@ fn main() -> Result<()> {
         '@'.on(Color::Red),     // 9
         '@'.on(Color::Green),   // 10
         '@'.on(Color::Yellow),  // 11
+    ];*/
+
+    let style_map: StyleMap = vec![ // 1 for character, 2 for wall, 0 for floor
+        '^'.on(Color::Red),  // test
+        ' '.on(Color::Grey), // 1
+        '@'.on(Color::Grey), // 2
+        '#'.on(Color::Grey), // 3
+        '*'.on(Color::Grey), // 4
+        ' '.on(Color::Blue), // 5
+        '@'.on(Color::Blue), // 6
+        '#'.on(Color::Blue), // 7
+        '*'.on(Color::Blue), // 8
     ];
 
-    let dimensions: Dimemsion = (201, 101);
+    let dimensions: Dimemsion = (200, 100);
     let view_port: Dimemsion = (150, 60);
 
     let mut game: GameState = GameState::new(dimensions, view_port, style_map);
 
     game.init_player((25, 25));
-    game.init_map();
-    //game.init_borders();
-    //game.init_field();
-    //game.init_background();
+    game.init_test_enemy((26, 26));
+    game.init_map(0.5);
 
     while game.running {
-        game.handle_collision();
-        game.handle_movement();
-        game.handle_render();
-        game.renderer.render()?;
-        game.renderer.insert_matrix((0, 0), game.map_generator.make_render());
-
         if is_event_availble()? {
             game.handle_input(read()?);
         }
+
+        game.handle_collision();
+        game.handle_movement();
+        game.handle_enemy_energy_move();
+        game.handle_render();
+        game.renderer.render()?;
+        game.renderer.insert_matrix((0, 0), game.map_generator.make_render());
     }
-
-    /*game.map_generator.randomize(0.48);
-    game.map_generator.generate();
-
-    loop {
-        //game.map_generator.run_generation();
-
-        game.renderer.insert_matrix((0, 0), game.map_generator.current_generation.clone());
-    
-        game.renderer.render();
-
-        if is_event_availble()? {
-            match read()? {
-                event => break,
-                _ => continue,
-            }
-        }
-    }*/ 
-    //println!("{:?}", game.map_generator.current_generation);
 
     Renderer::reset_term()?;
 
@@ -119,6 +105,8 @@ struct GameState {
     render_components: EntityMap<RenderComponent>,
     movement_components: EntityMap<MovementComponent>,
     collision_components: EntityMap<CollisionComponent>,
+    energy_components: EntityMap<EnergyComponent>,
+    enemy_ai_components: EntityMap<EnemyAIComponent>,
 
     // Player
     player: Option<Entity>,
@@ -140,6 +128,8 @@ impl GameState {
         let render_components = EntityMap::<RenderComponent>::new();
         let movement_components = EntityMap::<MovementComponent>::new();
         let collision_components = EntityMap::<CollisionComponent>::new();
+        let energy_components = EntityMap::<EnergyComponent>::new();
+        let enemy_ai_components = EntityMap::<EnemyAIComponent>::new();
         
         GameState {
             renderer,
@@ -151,6 +141,8 @@ impl GameState {
             render_components,
             movement_components,
             collision_components,
+            energy_components,
+            enemy_ai_components,
             player: None,
         }
     }
@@ -187,14 +179,37 @@ impl GameState {
             Event::Key(key_event) => {
                 match key_event.code {
                     KeyCode::Char('q') => self.running = false,
-                    KeyCode::Right => self.move_entity(player, Direction::Right),
-                    KeyCode::Left => self.move_entity(player, Direction::Left),
-                    KeyCode::Up => self.move_entity(player, Direction::Up),
-                    KeyCode::Down => self.move_entity(player, Direction::Down),
+                    KeyCode::Right => {
+                        self.move_entity(player, Direction::Right);
+                        self.add_ten_energy();
+                    },
+                    KeyCode::Left => {
+                        self.move_entity(player, Direction::Left);
+                        self.add_ten_energy();
+                    },
+                    KeyCode::Up => {
+                        self.move_entity(player, Direction::Up);
+                        self.add_ten_energy();
+                    },
+                    KeyCode::Down => {
+                        self.move_entity(player, Direction::Down);
+                        self.add_ten_energy();
+                    },
                     _ => return,
                 }
             },
             _ => return,
+        }
+    }
+
+    fn add_ten_energy(&mut self) {
+        for gen_index in self.entity_allocator.get_vec() {
+            let comp = match self.energy_components.get_mut(gen_index) {
+                Some(comp) => comp,
+                None => continue,
+            };
+
+            comp.energy += 10;
         }
     }
 
@@ -205,24 +220,55 @@ impl GameState {
             vec![],
         ];
         for gen_index in self.entity_allocator.get_vec() {
-            //if self.entity_allocator.is_live(gen_index) {
-                let comp = match self.render_components.get_mut(gen_index) {
-                    Some(comp) => comp,
-                    None => continue,
-                };
+            let comp = match self.render_components.get_mut(gen_index) {
+                Some(comp) => comp,
+                None => continue,
+            };
                 
-                // Handling Begins
+            // Handling Begins
 
-                if comp.visible {
-                    let tl = comp.position_tl;
-                    let br = comp.position_br;
-                    let matrix: Buffer = get_matrix(tl, br, comp.character);
-                    layers[comp.layer as usize].push((tl, matrix));
-                }
+            if comp.visible {
+                let tl = comp.position_tl;
+                let br = comp.position_br;
+                let matrix: Buffer = get_matrix(tl, br, comp.backgroud + comp.character);
+                layers[comp.layer as usize].push((tl, matrix));
+            }
         }
         for layer in layers.iter().rev() {
             for matrix in layer {
                 self.renderer.insert_matrix(matrix.0, matrix.1.clone());
+            }
+        }
+    }
+
+    fn handle_enemy_energy_move(&mut self) {
+        for gen_index in self.entity_allocator.get_vec() {
+            let ai_type: AIType = match self.enemy_ai_components.get(gen_index) {
+                Some(ai_type) => ai_type.ai_type.clone(),
+                None => continue,
+            };
+            
+            let comp = match self.energy_components.get_mut(gen_index) {
+                Some(comp) => comp,
+                None => continue,
+            };
+
+            let move_comp = match self.movement_components.get_mut(gen_index) {
+                Some(component) => component,
+                None => continue,
+            };         
+            if comp.energy >= 10 {
+                match ai_type {
+                    AIType::SimpleDown => {
+                        move_comp.move_desired(Direction::Down);
+                        comp.energy -= 10;
+                    },
+                    AIType::SimpleLeft => {
+                        move_comp.move_desired(Direction::Left);
+                        comp.energy -= 10;
+                    },
+                    _ => continue,
+                }
             }
         }
     }
@@ -247,10 +293,17 @@ impl GameState {
                         continue;
                     }
 
+                    let energy_comp = match self.energy_components.get_mut(gen_index) {
+                        Some(comp) => comp,
+                        None => continue,
+                    };
+
+                    energy_comp.energy -= 10;
+
                     let dif_x = 0;
                     let dif_y = 0;
                     
-                    render_comp.character = self.renderer.input_buffer[desired_x as usize][desired_y as usize] + 5;
+                    render_comp.backgroud = self.renderer.input_buffer[desired_x as usize][desired_y as usize];// + render_comp.character;
                     render_comp.position_tl = (desired_x, desired_y);
                     render_comp.position_br = (desired_x + dif_x as u16, desired_y + dif_y as u16);
 
@@ -264,56 +317,69 @@ impl GameState {
         // Ugh gotta fucking clear each time DUH
         self.collision_buffer = self.empty_buffer.clone();
         for gen_index in self.entity_allocator.get_vec() {
-            //if self.entity_allocator.is_live(gen_index) {
-                let comp = match self.collision_components.get_mut(gen_index) {
-                    Some(comp) => comp,
-                    None => continue,
-                };
+            let comp = match self.collision_components.get_mut(gen_index) {
+                Some(comp) => comp,
+                None => continue,
+            };
                 
-                // Handling Begins
+            // Handling Begins
 
-                // Update to potential new position
-                match self.render_components.get(gen_index) {
-                    Some(render_comp) => {
-                        //comp.top_left = render_comp.position_tl;
-                        //comp.bottom_right = render_comp.position_br;
-                        comp.matrix = get_matrix(render_comp.position_tl, render_comp.position_br, 1);
-                    },
-                    None => (),
-                }
+            // Update to potential new position
+            match self.render_components.get(gen_index) {
+                Some(render_comp) => {
+                    comp.matrix = get_matrix(render_comp.position_tl, render_comp.position_br, 1);
+                },
+                None => (),
+            }
 
-                // Build and insert into collision buffer
-                //let matrix = get_matrix(comp.top_left, comp.bottom_right, 1);
-                insert_matrix(&mut self.collision_buffer, comp.position, comp.matrix.clone());
-            //}
+            insert_matrix(&mut self.collision_buffer, comp.position, comp.matrix.clone());
         }
     }
 
     fn init_player(&mut self, position: (u16, u16)) {
         let player_entity = self.entity_allocator.allocate();
 
-        let render_comp = RenderComponent::new(8, position, position, 0);
+        let render_comp = RenderComponent::new(1, 0, position, position, 0);
         let movement_comp = MovementComponent::new(position);
         let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1));
+        let energy_comp = EnergyComponent::new(0);
 
         self.render_components.set(player_entity, render_comp);
         self.movement_components.set(player_entity, movement_comp);
         self.collision_components.set(player_entity, collision_comp);
+        self.energy_components.set(player_entity, energy_comp);
 
         self.player = Some(player_entity)
     }
 
-    fn init_map(&mut self) {
+    fn init_map(&mut self, percentage: f64) {
         let entity = self.entity_allocator.allocate();
 
-        self.map_generator.randomize(0.48);
+        self.map_generator.randomize(percentage);
         self.map_generator.generate();
 
         let collision_comp = CollisionComponent::new((0, 0), self.map_generator.current_generation.clone());
+        
         self.collision_components.set(entity, collision_comp);
-
     }
 
+    fn init_test_enemy(&mut self, position: (u16, u16)) {
+        let entity = self.entity_allocator.allocate();
+
+        let render_comp = RenderComponent::new(3, 0, position, position, 0);
+        let movement_comp = MovementComponent::new(position);
+        let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1));
+        let energy_comp = EnergyComponent::new(0);
+        let enemy_ai_comp = EnemyAIComponent::new(AIType::SimpleDown);
+
+        self.render_components.set(entity, render_comp);
+        self.movement_components.set(entity, movement_comp);
+        self.collision_components.set(entity, collision_comp);
+        self.energy_components.set(entity, energy_comp);
+        self.enemy_ai_components.set(entity, enemy_ai_comp);
+    }
+
+    /*
     fn init_borders(&mut self) {
         let top = ((1, 1), (self.renderer.view_port.0, 1));
         let left = ((1, 1), (1, self.renderer.view_port.1));
@@ -351,7 +417,7 @@ impl GameState {
 
         let render_comp = RenderComponent::new(2, (0, 0), (dimensions.0, dimensions.1), 2);
         self.render_components.set(entity, render_comp);
-    }
+    }*/
 }
 
 fn get_matrix(tl: (u16, u16), br: (u16, u16), value: u8) -> Buffer {
