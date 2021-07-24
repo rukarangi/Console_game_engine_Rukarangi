@@ -42,7 +42,39 @@ impl MapGenerator {
         }
     }
 
-    pub fn run_generation(&mut self) {
+    pub fn generate(&mut self) {
+        loop {
+            self.run_generation();
+
+            if self.current_generation == self.last_generation {
+                break;
+            }
+        }
+    }
+
+    pub fn make_render(&self) -> Vec<Vec<u8>> {
+        let mut result = self.last_generation.clone();
+
+        for (x, col) in self.last_generation.iter().enumerate() {
+            for (y, val) in col.iter().enumerate() {
+                match val {
+                    0 => {
+                        result[x][y] = 2;
+                    },
+                    1 => {
+                        result[x][y] = 1;
+                    },
+                    _ => {
+                        result[x][y] = 1;
+                    },
+                }
+            }
+        }
+        
+        return result;
+    }
+
+    fn run_generation(&mut self) {
         self.last_generation = self.current_generation.clone();
 
         for (x, col) in self.last_generation.iter().enumerate() {
@@ -52,12 +84,22 @@ impl MapGenerator {
                     None => continue,
                 };
 
-                if border_count < 4 {
-                    self.current_generation[x][y] = 0;
-                } else if border_count > 4 {
-                    self.current_generation[x][y] = 1;
-                } else {
-                    self.current_generation[x][y] = self.last_generation[x][y];
+                match val {
+                    0 => {
+                        if border_count >= 5 {
+                            self.current_generation[x][y] = 1;
+                        } else {
+                            self.current_generation[x][y] = 0;
+                        }
+                    },
+                    1 => {
+                        if border_count >= 4 {
+                            self.current_generation[x][y] = 1;
+                        } else {
+                            self.current_generation[x][y] = 0;
+                        }
+                    },
+                    _ => continue,
                 }
 
             }
@@ -81,7 +123,7 @@ impl MapGenerator {
                     continue; // target location dont count
                 }
 
-                println!("{}, {}", location.0 , location.1);
+                //println!("{}, {}", location.0 , location.1);
                 count += self.last_generation[x + location.0 - 1][y + location.1 - 1];
             }
         }

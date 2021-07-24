@@ -35,9 +35,9 @@ pub type Entity = generations::GenerationalIndex;
 
 /*
 Notes: 
-kinda funkin
-thinkin its the movement handler
-not quite using desired_pos right
+after adding map, for blindness add high layer of "blind"
+then use collision buffer and local to remove parts,
+thus making it clear and visible.
 
 ok move working, now fields things that arent collider but visible
 */
@@ -63,28 +63,30 @@ fn main() -> Result<()> {
 
     let mut game: GameState = GameState::new(dimensions, view_port, style_map);
 
-    game.init_player((15, 15));
-    game.init_borders();
-    game.init_field();
-    game.init_background();
+    game.init_player((25, 25));
+    game.init_map();
+    //game.init_borders();
+    //game.init_field();
+    //game.init_background();
 
     while game.running {
         game.handle_collision();
         game.handle_movement();
         game.handle_render();
         game.renderer.render()?;
+        game.renderer.insert_matrix((0, 0), game.map_generator.make_render());
 
         if is_event_availble()? {
             game.handle_input(read()?);
         }
     }
 
-    game.map_generator.randomize(0.5);
-    game.map_generator.run_generation();
-    game.map_generator.run_generation();
-    game.map_generator.run_generation();
-    
+    /*game.map_generator.randomize(0.48);
+    game.map_generator.generate();
+
     loop {
+        //game.map_generator.run_generation();
+
         game.renderer.insert_matrix((0, 0), game.map_generator.current_generation.clone());
     
         game.renderer.render();
@@ -95,7 +97,7 @@ fn main() -> Result<()> {
                 _ => continue,
             }
         }
-    }
+    }*/ 
     //println!("{:?}", game.map_generator.current_generation);
 
     Renderer::reset_term()?;
@@ -301,6 +303,17 @@ impl GameState {
         self.player = Some(player_entity)
     }
 
+    fn init_map(&mut self) {
+        let entity = self.entity_allocator.allocate();
+
+        self.map_generator.randomize(0.48);
+        self.map_generator.generate();
+
+        let collision_comp = CollisionComponent::new((0, 0), self.map_generator.current_generation.clone());
+        self.collision_components.set(entity, collision_comp);
+
+    }
+
     fn init_borders(&mut self) {
         let top = ((1, 1), (self.renderer.view_port.0, 1));
         let left = ((1, 1), (1, self.renderer.view_port.1));
@@ -336,7 +349,7 @@ impl GameState {
         let entity = self.entity_allocator.allocate();
         let dimensions = self.renderer.dimensions;
 
-        let render_comp = RenderComponent::new(3, (0, 0), (dimensions.0, dimensions.1), 2);
+        let render_comp = RenderComponent::new(2, (0, 0), (dimensions.0, dimensions.1), 2);
         self.render_components.set(entity, render_comp);
     }
 }
