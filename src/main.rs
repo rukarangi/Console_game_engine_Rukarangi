@@ -21,6 +21,8 @@ mod renderer;
 use crate::renderer::*;
 mod components;
 use crate::components::*;
+mod enemy_ai;
+use crate::enemy_ai::*;
 mod map_generation;
 use crate::map_generation::*;
 
@@ -34,24 +36,26 @@ then use collision buffer and local to remove parts,
 thus making it clear and visible.
 
 ok move working, now fields things that arent collider but visible
+
+IDEA:
+
+fn handle_comps(&mut self) {
+    for gen_index in self.entity_allocator.get_vec() {
+        let comp_x = self.x_components.get_mut(gen_index);
+        ...
+
+        match (comp_x, comp_y, ..) {
+            (Some(x), Some(y)) => handle_x_y(x, y),
+            (Some(x), None) => handle_x(x),
+            ..
+        }
+
+    }
+}
+
 */
 
 fn main() -> Result<()> {
-    /*let style_map: StyleMap = vec![ // add 5 for player
-        '_'.on_black(),         // 0  test
-        '#'.on_blue(),          // 1  test
-        ' '.on(Color::Grey),    // 2
-        ' '.on(Color::Blue),    // 3  default backgroud for now
-        ' '.on(Color::Red),     // 4
-        ' '.on(Color::Green),   // 5
-        ' '.on(Color::Yellow),  // 6
-        '@'.on(Color::Grey),    // 7
-        '@'.on(Color::Blue),    // 8  default player for now
-        '@'.on(Color::Red),     // 9
-        '@'.on(Color::Green),   // 10
-        '@'.on(Color::Yellow),  // 11
-    ];*/
-
     let style_map: StyleMap = vec![ // 1 for character, 2 for wall, 0 for floor
         '^'.on(Color::Red),  // test
         ' '.on(Color::Grey), // 1
@@ -69,9 +73,12 @@ fn main() -> Result<()> {
 
     let mut game: GameState = GameState::new(dimensions, view_port, style_map);
 
-    game.init_player((25, 25));
-    game.init_test_enemy((26, 26));
-    game.init_map(0.5);
+    game.init_player((5, 5));
+    game.init_test_enemy((6, 2));
+    //game.init_map(0.5);
+    game.init_borders();
+    game.init_background();
+    game.init_field();
 
     while game.running {
         if is_event_availble()? {
@@ -83,7 +90,18 @@ fn main() -> Result<()> {
         game.handle_enemy_energy_move();
         game.handle_render();
         game.renderer.render()?;
-        game.renderer.insert_matrix((0, 0), game.map_generator.make_render());
+        //game.renderer.insert_matrix((0, 0), game.map_generator.make_render());
+    }
+
+    game.running = true;
+
+    while game.running {
+        if is_event_availble()? {
+            game.handle_input(read()?);
+        }
+
+        game.renderer.insert_matrix((0, 0),game.collision_buffer.clone());
+        game.renderer.render()?;
     }
 
     Renderer::reset_term()?;
@@ -248,6 +266,11 @@ impl GameState {
                 None => continue,
             };
             
+            let render_comp = match self.render_components.get(gen_index) {
+                Some(comp) => comp,
+                None => continue,
+            };
+
             let comp = match self.energy_components.get_mut(gen_index) {
                 Some(comp) => comp,
                 None => continue,
@@ -260,8 +283,18 @@ impl GameState {
             if comp.energy >= 10 {
                 match ai_type {
                     AIType::SimpleDown => {
-                        move_comp.move_desired(Direction::Down);
-                        comp.energy -= 10;
+                        //move_comp.move_desired(Direction::Down);
+                        //comp.energy -= 10;
+                        match simple_down(render_comp.position_tl, &self.collision_buffer) {
+                            (Action::DoNothing, x) => {
+                                comp.energy -= x;
+                            },
+                            (Action::Move(dir), x) => {
+                                move_comp.move_desired(dir);
+                                comp.energy -= x;
+                            },
+                            _ => continue,
+                        }
                     },
                     AIType::SimpleLeft => {
                         move_comp.move_desired(Direction::Left);
@@ -293,12 +326,12 @@ impl GameState {
                         continue;
                     }
 
-                    let energy_comp = match self.energy_components.get_mut(gen_index) {
+                    /*let energy_comp = match self.energy_components.get_mut(gen_index) {
                         Some(comp) => comp,
                         None => continue,
-                    };
+                    };*/
 
-                    energy_comp.energy -= 10;
+                    //energy_comp.energy -= 10;
 
                     let dif_x = 0;
                     let dif_y = 0;
@@ -327,6 +360,7 @@ impl GameState {
             // Update to potential new position
             match self.render_components.get(gen_index) {
                 Some(render_comp) => {
+                    comp.position = render_comp.position_tl;
                     comp.matrix = get_matrix(render_comp.position_tl, render_comp.position_br, 1);
                 },
                 None => (),
@@ -339,15 +373,15 @@ impl GameState {
     fn init_player(&mut self, position: (u16, u16)) {
         let player_entity = self.entity_allocator.allocate();
 
-        let render_comp = RenderComponent::new(1, 0, position, position, 0);
+        let render_comp = RenderComponent::new(1, 1, position, position, 0);
         let movement_comp = MovementComponent::new(position);
         let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1));
-        let energy_comp = EnergyComponent::new(0);
+        //let energy_comp = EnergyComponent::new(0);
 
         self.render_components.set(player_entity, render_comp);
         self.movement_components.set(player_entity, movement_comp);
         self.collision_components.set(player_entity, collision_comp);
-        self.energy_components.set(player_entity, energy_comp);
+        //self.energy_components.set(player_entity, energy_comp);
 
         self.player = Some(player_entity)
     }
@@ -366,7 +400,7 @@ impl GameState {
     fn init_test_enemy(&mut self, position: (u16, u16)) {
         let entity = self.entity_allocator.allocate();
 
-        let render_comp = RenderComponent::new(3, 0, position, position, 0);
+        let render_comp = RenderComponent::new(3, 1, position, position, 0);
         let movement_comp = MovementComponent::new(position);
         let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1));
         let energy_comp = EnergyComponent::new(0);
@@ -379,7 +413,7 @@ impl GameState {
         self.enemy_ai_components.set(entity, enemy_ai_comp);
     }
 
-    /*
+    
     fn init_borders(&mut self) {
         let top = ((1, 1), (self.renderer.view_port.0, 1));
         let left = ((1, 1), (1, self.renderer.view_port.1));
@@ -394,7 +428,7 @@ impl GameState {
             let entity = self.entity_allocator.allocate();
             
             let collision_comp = CollisionComponent::new(border.0, get_matrix(border.0, border.1, 1));
-            let render_comp = RenderComponent::new(1, border.0, border.1, 0);
+            let render_comp = RenderComponent::new(2, 1, border.0, border.1, 0);
             
             self.collision_components.set(entity, collision_comp);
             self.render_components.set(entity, render_comp);
@@ -403,11 +437,11 @@ impl GameState {
 
     fn init_field(&mut self) {
         let field: Vec<Vec<u8>> = vec![
-            vec![0; 20]; 20
+            vec![0; 20],
         ];
         let entity = self.entity_allocator.allocate();
 
-        let render_comp = RenderComponent::new(6, (50, 10), (70, 30), 1);
+        let render_comp = RenderComponent::new(0, 5, (50, 10), (70, 30), 1);
         self.render_components.set(entity, render_comp);
     }
 
@@ -415,9 +449,9 @@ impl GameState {
         let entity = self.entity_allocator.allocate();
         let dimensions = self.renderer.dimensions;
 
-        let render_comp = RenderComponent::new(2, (0, 0), (dimensions.0, dimensions.1), 2);
+        let render_comp = RenderComponent::new(0, 1, (0, 0), (dimensions.0, dimensions.1), 2);
         self.render_components.set(entity, render_comp);
-    }*/
+    }
 }
 
 fn get_matrix(tl: (u16, u16), br: (u16, u16), value: u8) -> Buffer {

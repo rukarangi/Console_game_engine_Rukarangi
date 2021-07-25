@@ -14,25 +14,6 @@ impl EnergyComponent {
 }
 
 #[derive(Clone, Debug)]
-pub enum AIType {
-    SimpleDown,
-    SimpleLeft,
-}
-
-#[derive(Clone, Debug)]
-pub struct EnemyAIComponent {
-    pub ai_type: AIType,
-}
-
-impl EnemyAIComponent {
-    pub fn new(ai_type: AIType) -> EnemyAIComponent {
-        EnemyAIComponent {
-            ai_type,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
 pub struct CollisionComponent {
     pub position: (u16, u16),
     //pub bottom_right: (u16, u16),
@@ -76,6 +57,7 @@ pub struct MovementComponent {
     pub desired_position: (u16, u16),
 }
 
+#[derive(Clone, Debug)]
 pub enum Direction {
     Up,
     Down,
