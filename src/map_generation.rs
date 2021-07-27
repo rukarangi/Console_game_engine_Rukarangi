@@ -42,7 +42,7 @@ impl MapGenerator {
     }
 
     pub fn generate(&mut self) {
-        loop {
+        for _ in 0..10 {
             self.run_generation();
 
             if self.current_generation == self.last_generation {

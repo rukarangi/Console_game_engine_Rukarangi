@@ -1,4 +1,5 @@
 use std::default::Default;
+use crate::renderer::Buffer;
 
 #[derive(Clone, Debug)]
 pub struct EnergyComponent {
@@ -18,15 +19,18 @@ pub struct CollisionComponent {
     pub position: (u16, u16),
     //pub bottom_right: (u16, u16),
     pub matrix: Vec<Vec<u8>>,
+    pub layer: u8
 }
 
 impl CollisionComponent {
-    pub fn new(position: (u16, u16), matrix: Vec<Vec<u8>>) -> CollisionComponent {
+    pub fn new(position: (u16, u16), matrix: Vec<Vec<u8>>, layer: u8) -> CollisionComponent {
         CollisionComponent { 
             position,
             matrix,
+            layer,
         }
-    }   
+    }
+
 }
 
 #[derive(Clone, Debug)]
@@ -34,21 +38,37 @@ pub struct RenderComponent {
     pub character: u8,
     pub backgroud: u8,
     pub position_tl: (u16, u16),
-    pub position_br: (u16, u16),
+    pub matrix: Buffer,
     pub visible: bool,
     pub layer: u16,
 }
 
 impl RenderComponent {
-    pub fn new(character: u8, backgroud: u8, position_tl: (u16, u16), position_br: (u16, u16), layer: u16) -> RenderComponent {
+    pub fn new(character: u8, backgroud: u8, position_tl: (u16, u16), matrix: Buffer, layer: u16) -> RenderComponent {
         RenderComponent {
             character,
             backgroud,
             position_tl,
-            position_br,
+            matrix,
             visible: true,
             layer,
         }
+    }
+
+    pub fn make_render(&mut self) -> Buffer {
+        let mut result: Buffer = self.matrix.clone();
+        
+        for (x, col) in self.matrix.iter().enumerate() {
+            for (y, val) in col.iter().enumerate() {
+                match val {
+                    0 => result[x][y] = self.backgroud,
+                    1 => result[x][y] = self.backgroud + self.character,
+                    _ => result[x][y] = 0,
+                }
+            }
+        }
+
+        return result;
     }
 }
 

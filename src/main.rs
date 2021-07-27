@@ -73,12 +73,18 @@ fn main() -> Result<()> {
 
     let mut game: GameState = GameState::new(dimensions, view_port, style_map);
 
-    game.init_player((5, 5));
-    game.init_test_enemy((6, 2));
-    //game.init_map(0.5);
-    game.init_borders();
-    game.init_background();
-    game.init_field();
+    let random_map = true;
+
+    game.init_player((20, 20));
+    game.init_test_enemy((22, 18));
+
+    if random_map {
+        game.init_map(0.2); // 0.5 is good
+    } else {
+        game.init_borders();
+        game.init_background();
+        game.init_field();
+    }
 
     while game.running {
         if is_event_availble()? {
@@ -90,7 +96,7 @@ fn main() -> Result<()> {
         game.handle_enemy_energy_move();
         game.handle_render();
         game.renderer.render()?;
-        //game.renderer.insert_matrix((0, 0), game.map_generator.make_render());
+        
     }
 
     game.running = true;
@@ -99,6 +105,8 @@ fn main() -> Result<()> {
         if is_event_availble()? {
             game.handle_input(read()?);
         }
+
+        game.handle_collision();
 
         game.renderer.insert_matrix((0, 0),game.collision_buffer.clone());
         game.renderer.render()?;
@@ -247,8 +255,8 @@ impl GameState {
 
             if comp.visible {
                 let tl = comp.position_tl;
-                let br = comp.position_br;
-                let matrix: Buffer = get_matrix(tl, br, comp.backgroud + comp.character);
+                //let br = comp.position_br;
+                let matrix: Buffer = comp.make_render();//get_matrix(tl, br, comp.backgroud + comp.character);
                 layers[comp.layer as usize].push((tl, matrix));
             }
         }
@@ -326,20 +334,11 @@ impl GameState {
                         continue;
                     }
 
-                    /*let energy_comp = match self.energy_components.get_mut(gen_index) {
-                        Some(comp) => comp,
-                        None => continue,
-                    };*/
-
-                    //energy_comp.energy -= 10;
-
                     let dif_x = 0;
                     let dif_y = 0;
                     
                     render_comp.backgroud = self.renderer.input_buffer[desired_x as usize][desired_y as usize];// + render_comp.character;
                     render_comp.position_tl = (desired_x, desired_y);
-                    render_comp.position_br = (desired_x + dif_x as u16, desired_y + dif_y as u16);
-
                     },
                 None => continue,
             }
@@ -347,35 +346,44 @@ impl GameState {
     }
 
     fn handle_collision(&mut self) {
-        // Ugh gotta fucking clear each time DUH
         self.collision_buffer = self.empty_buffer.clone();
+
+        let mut layers: Vec<Vec<(Dimemsion, Buffer)>> = vec![
+            vec![],
+            vec![],
+            vec![],
+        ];
         for gen_index in self.entity_allocator.get_vec() {
             let comp = match self.collision_components.get_mut(gen_index) {
                 Some(comp) => comp,
                 None => continue,
             };
                 
-            // Handling Begins
-
-            // Update to potential new position
             match self.render_components.get(gen_index) {
                 Some(render_comp) => {
                     comp.position = render_comp.position_tl;
-                    comp.matrix = get_matrix(render_comp.position_tl, render_comp.position_br, 1);
+                    comp.matrix = render_comp.matrix.clone();
                 },
                 None => (),
             }
+            let matrix: Buffer = comp.matrix.clone();//get_matrix(tl, br, comp.backgroud + comp.character);
+            layers[comp.layer as usize].push((comp.position, matrix));
+        }
+        for layer in layers.iter().rev() {
+            for matrix in layer {
+                //self.renderer.insert_matrix(matrix.0, matrix.1.clone());
+                insert_matrix(&mut self.collision_buffer, matrix.0, matrix.1.clone());
 
-            insert_matrix(&mut self.collision_buffer, comp.position, comp.matrix.clone());
+            }
         }
     }
 
     fn init_player(&mut self, position: (u16, u16)) {
         let player_entity = self.entity_allocator.allocate();
 
-        let render_comp = RenderComponent::new(1, 1, position, position, 0);
+        let render_comp = RenderComponent::new(1, 1, position, get_matrix(position, position, 1), 0);
         let movement_comp = MovementComponent::new(position);
-        let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1));
+        let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1), 0);
         //let energy_comp = EnergyComponent::new(0);
 
         self.render_components.set(player_entity, render_comp);
@@ -392,19 +400,21 @@ impl GameState {
         self.map_generator.randomize(percentage);
         self.map_generator.generate();
 
-        let collision_comp = CollisionComponent::new((0, 0), self.map_generator.current_generation.clone());
-        
+        let collision_comp = CollisionComponent::new((0, 0), self.map_generator.current_generation.clone(), 2);
+        let render_comp = RenderComponent::new(2, 1, (0, 0), self.map_generator.current_generation.clone(), 2); 
+
         self.collision_components.set(entity, collision_comp);
+        self.render_components.set(entity, render_comp);
     }
 
     fn init_test_enemy(&mut self, position: (u16, u16)) {
         let entity = self.entity_allocator.allocate();
 
-        let render_comp = RenderComponent::new(3, 1, position, position, 0);
+        let render_comp = RenderComponent::new(3, 1, position, get_matrix(position, position, 1), 0);
         let movement_comp = MovementComponent::new(position);
-        let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1));
+        let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1), 0);
         let energy_comp = EnergyComponent::new(0);
-        let enemy_ai_comp = EnemyAIComponent::new(AIType::SimpleDown);
+        let enemy_ai_comp = EnemyAIComponent::new(AIType::SimpleLeft);
 
         self.render_components.set(entity, render_comp);
         self.movement_components.set(entity, movement_comp);
@@ -427,8 +437,8 @@ impl GameState {
         for border in borders {
             let entity = self.entity_allocator.allocate();
             
-            let collision_comp = CollisionComponent::new(border.0, get_matrix(border.0, border.1, 1));
-            let render_comp = RenderComponent::new(2, 1, border.0, border.1, 0);
+            let collision_comp = CollisionComponent::new(border.0, get_matrix(border.0, border.1, 1), 0);
+            let render_comp = RenderComponent::new(2, 1, border.0, get_matrix(border.0, border.1, 1), 0);
             
             self.collision_components.set(entity, collision_comp);
             self.render_components.set(entity, render_comp);
@@ -441,7 +451,7 @@ impl GameState {
         ];
         let entity = self.entity_allocator.allocate();
 
-        let render_comp = RenderComponent::new(0, 5, (50, 10), (70, 30), 1);
+        let render_comp = RenderComponent::new(0, 5, (50, 10), get_matrix((50, 10), (70, 30), 1), 1);
         self.render_components.set(entity, render_comp);
     }
 
@@ -449,7 +459,7 @@ impl GameState {
         let entity = self.entity_allocator.allocate();
         let dimensions = self.renderer.dimensions;
 
-        let render_comp = RenderComponent::new(0, 1, (0, 0), (dimensions.0, dimensions.1), 2);
+        let render_comp = RenderComponent::new(0, 1, (0, 0), get_matrix((0, 0), (dimensions.0, dimensions.1), 1), 2);
         self.render_components.set(entity, render_comp);
     }
 }
