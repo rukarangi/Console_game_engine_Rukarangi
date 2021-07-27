@@ -79,7 +79,7 @@ fn main() -> Result<()> {
     game.init_test_enemy((22, 18));
 
     if random_map {
-        game.init_map(0.2); // 0.5 is good
+        game.init_map(0.43); // 0.5 is good
     } else {
         game.init_borders();
         game.init_background();
@@ -108,7 +108,7 @@ fn main() -> Result<()> {
 
         game.handle_collision();
 
-        game.renderer.insert_matrix((0, 0),game.collision_buffer.clone());
+        game.renderer.insert_matrix((0, 0), &game.collision_buffer);
         game.renderer.render()?;
     }
 
@@ -262,7 +262,7 @@ impl GameState {
         }
         for layer in layers.iter().rev() {
             for matrix in layer {
-                self.renderer.insert_matrix(matrix.0, matrix.1.clone());
+                self.renderer.insert_matrix(matrix.0, &matrix.1);
             }
         }
     }
@@ -372,7 +372,7 @@ impl GameState {
         for layer in layers.iter().rev() {
             for matrix in layer {
                 //self.renderer.insert_matrix(matrix.0, matrix.1.clone());
-                insert_matrix(&mut self.collision_buffer, matrix.0, matrix.1.clone());
+                insert_matrix(&mut self.collision_buffer, matrix.0, &matrix.1);
 
             }
         }
@@ -480,7 +480,7 @@ fn get_matrix(tl: (u16, u16), br: (u16, u16), value: u8) -> Buffer {
     vec![vec![value; height]; length]
 }
 
-fn insert_matrix(buffer: &mut Buffer, location: (u16, u16), matrix: Buffer) {
+fn insert_matrix(buffer: &mut Buffer, location: (u16, u16), matrix: &Buffer) {
     let (column, row) : (usize, usize) = (location.0.into(), location.1.into());
 
     for (x, col) in matrix.iter().enumerate() {

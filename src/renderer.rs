@@ -111,10 +111,10 @@ impl Renderer {
     pub fn insert_char(&mut self, location: (u16, u16), value: u8) {
         let single_matrix = vec![vec![value]];
 
-        self.insert_matrix(location, single_matrix);
+        self.insert_matrix(location, &single_matrix);
     }
 
-    pub fn insert_matrix(&mut self, location: (u16, u16), matrix: Buffer) {
+    pub fn insert_matrix(&mut self, location: (u16, u16), matrix: &Buffer) {
         let (column, row) : (usize, usize) = (location.0.into(), location.1.into());
 
         for (x, col) in matrix.iter().enumerate() {
