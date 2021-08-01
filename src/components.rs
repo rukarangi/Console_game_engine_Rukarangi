@@ -2,6 +2,14 @@ use std::default::Default;
 use crate::renderer::Buffer;
 
 #[derive(Clone, Debug)]
+pub enum ComponentList {
+    Render(RenderComponent),
+    Collision(CollisionComponent),
+    Energy(EnergyComponent),
+    Movement(MovementComponent),
+}
+
+#[derive(Clone, Debug)]
 pub struct EnergyComponent {
     pub energy: u8,
 }

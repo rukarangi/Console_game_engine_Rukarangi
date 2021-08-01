@@ -25,6 +25,8 @@ mod enemy_ai;
 use crate::enemy_ai::*;
 mod map_generation;
 use crate::map_generation::*;
+mod dijkstra_maps;
+use crate::dijkstra_maps::*;
 
 type EntityMap<T> = generations::GenerationalIndexArray<T>;
 pub type Entity = generations::GenerationalIndex;
@@ -66,6 +68,31 @@ fn main() -> Result<()> {
         '@'.on(Color::Blue), // 6
         '#'.on(Color::Blue), // 7
         '*'.on(Color::Blue), // 8
+        ' '.on(Color::AnsiValue(255)),  // dijk stuff
+        ' '.on(Color::AnsiValue(254)), // 10
+        ' '.on(Color::AnsiValue(253)), // 11
+        ' '.on(Color::AnsiValue(252)), // 12
+        ' '.on(Color::AnsiValue(251)), // 13
+        ' '.on(Color::AnsiValue(250)), // 14
+        ' '.on(Color::AnsiValue(249)), // 15
+        ' '.on(Color::AnsiValue(248)), // 16
+        ' '.on(Color::AnsiValue(247)), // 17
+        ' '.on(Color::AnsiValue(246)), // 18
+        ' '.on(Color::AnsiValue(245)), // 19
+        ' '.on(Color::AnsiValue(244)), // 20
+        ' '.on(Color::AnsiValue(243)), // 21
+        ' '.on(Color::AnsiValue(242)), // 22
+        ' '.on(Color::AnsiValue(241)), // 23
+        ' '.on(Color::AnsiValue(240)), // 24
+        ' '.on(Color::AnsiValue(239)), // 25
+        ' '.on(Color::AnsiValue(238)), // 26
+        ' '.on(Color::AnsiValue(237)), // 27
+        ' '.on(Color::AnsiValue(236)), // 28
+        ' '.on(Color::AnsiValue(235)), // 29
+        ' '.on(Color::AnsiValue(234)), // 30
+        ' '.on(Color::AnsiValue(233)), // 31
+        ' '.on(Color::AnsiValue(232)), // 32
+        ' '.on(Color::AnsiValue(231)), // 33
     ];
 
     let dimensions: Dimemsion = (200, 100);
@@ -73,13 +100,13 @@ fn main() -> Result<()> {
 
     let mut game: GameState = GameState::new(dimensions, view_port, style_map);
 
-    let random_map = true;
+    let random_map = false;
 
     game.init_player((20, 20));
     game.init_test_enemy((22, 18));
 
     if random_map {
-        game.init_map(0.43); // 0.5 is good
+        game.init_map(0.5); // 0.5 is good
     } else {
         game.init_borders();
         game.init_background();
@@ -112,6 +139,37 @@ fn main() -> Result<()> {
         game.renderer.render()?;
     }
 
+    game.running = true;
+
+    //game.handle_collision();
+    let col_influence: Influence = Influence {
+        position: (0, 0),
+        matrix: game.collision_buffer.clone(),
+        value: u32::MAX,
+    };
+    let player_influence: Influence = Influence {
+        position: (10, 10),
+        matrix: vec![vec![1]],
+        value: 0,
+    };
+    game.player_dijk.influences = vec![col_influence, player_influence];
+    game.player_dijk.generate();
+
+    while game.running {
+        if is_event_availble()? {
+            game.test_influences();
+            game.handle_input(read()?);
+        }
+
+        game.handle_collision();
+        game.handle_movement();
+
+        
+
+        game.renderer.insert_matrix((0, 0), &game.player_dijk.make_render());
+        game.renderer.render()?;
+    }
+
     Renderer::reset_term()?;
 
     Ok(())
@@ -121,6 +179,7 @@ struct GameState {
     // resources
     renderer: Renderer,
     collision_buffer: Buffer,
+    player_dijk: DijkstraMap,
     running: bool,
     empty_buffer: Buffer,
     map_generator: MapGenerator,
@@ -146,6 +205,7 @@ impl GameState {
             Err(err) => panic!("Failed Renderer Intialisation: {}", err),
         };
         let collision_buffer = renderer.input_buffer.clone();
+        let player_dijk = DijkstraMap::new(dimensions, Vec::new());
         let empty_buffer = renderer.input_buffer.clone();
         let map_generator = MapGenerator::new(dimensions);
         
@@ -160,6 +220,7 @@ impl GameState {
         GameState {
             renderer,
             collision_buffer,
+            player_dijk,
             running: true,
             empty_buffer,
             map_generator,
@@ -171,6 +232,31 @@ impl GameState {
             enemy_ai_components,
             player: None,
         }
+    }
+
+    fn test_influences(&mut self) {
+        let player = match self.player {
+            Some(e) => e,
+            None => panic!("No player!"),
+        };
+
+        let comp = match self.render_components.get_mut(player) {
+            Some(comp) => comp,
+            None => panic!("No player!"),
+        };
+        let col_influence: Influence = Influence {
+            position: (0, 0),
+            matrix: self.collision_buffer.clone(),
+            value: u32::MAX,
+        };
+        let player_influence: Influence = Influence {
+            position: comp.position_tl,
+            matrix: vec![vec![1]],
+            value: 0,
+        };
+        
+        self.player_dijk.influences = vec![col_influence, player_influence];
+        self.player_dijk.generate();
     }
 
     fn test_movement(&mut self) {
@@ -378,20 +464,34 @@ impl GameState {
         }
     }
 
+    fn produce_player_dijkstra(&mut self) {
+        //
+    }
+
+    fn add_entity(&mut self, components: Vec<ComponentList>) -> Entity {
+        let entity = self.entity_allocator.allocate();
+
+        for component in components {
+            match component {
+                ComponentList::Render(comp) => self.render_components.set(entity, comp),
+                ComponentList::Collision(comp) => self.collision_components.set(entity, comp),
+                ComponentList::Energy(comp) => self.energy_components.set(entity, comp),
+                ComponentList::Movement(comp) => self.movement_components.set(entity, comp),
+            }
+        }
+
+        return entity;
+    }
+
     fn init_player(&mut self, position: (u16, u16)) {
-        let player_entity = self.entity_allocator.allocate();
+        let mut comps: Vec<ComponentList> = Vec::new();
+        comps.push(ComponentList::Render(RenderComponent::new(1, 1, position, get_matrix(position, position, 1), 0)));
+        comps.push(ComponentList::Movement(MovementComponent::new(position)));
+        comps.push(ComponentList::Collision(CollisionComponent::new(position, get_matrix(position, position, 1), 0)));
 
-        let render_comp = RenderComponent::new(1, 1, position, get_matrix(position, position, 1), 0);
-        let movement_comp = MovementComponent::new(position);
-        let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1), 0);
-        //let energy_comp = EnergyComponent::new(0);
+        let player_entity = Some(self.add_entity(comps));
 
-        self.render_components.set(player_entity, render_comp);
-        self.movement_components.set(player_entity, movement_comp);
-        self.collision_components.set(player_entity, collision_comp);
-        //self.energy_components.set(player_entity, energy_comp);
-
-        self.player = Some(player_entity)
+        self.player = player_entity;
     }
 
     fn init_map(&mut self, percentage: f64) {

@@ -41,9 +41,9 @@ impl Renderer {
     pub fn initialize(dimensions: Dimemsion, view_port: Dimemsion, style_map: StyleMap) -> Result<Renderer> {
         enable_raw_mode()?;
         execute!(
-        stdout(), EnterAlternateScreen, Hide,
-        SetBackgroundColor(Color::Black),
-        SetForegroundColor(Color::Black),
+            stdout(), EnterAlternateScreen, Hide,
+            SetBackgroundColor(Color::Black),
+            SetForegroundColor(Color::Black),
         )?;
         
         execute!(
