@@ -141,19 +141,7 @@ fn main() -> Result<()> {
 
     game.running = true;
 
-    //game.handle_collision();
-    let col_influence: Influence = Influence {
-        position: (0, 0),
-        matrix: game.collision_buffer.clone(),
-        value: u32::MAX,
-    };
-    let player_influence: Influence = Influence {
-        position: (10, 10),
-        matrix: vec![vec![1]],
-        value: 0,
-    };
-    game.player_dijk.influences = vec![col_influence, player_influence];
-    game.player_dijk.generate();
+    game.test_influences();
 
     while game.running {
         if is_event_availble()? {
@@ -165,12 +153,23 @@ fn main() -> Result<()> {
         game.handle_movement();
 
         
-
+        //game.renderer.
         game.renderer.insert_matrix((0, 0), &game.player_dijk.make_render());
         game.renderer.render()?;
     }
 
     Renderer::reset_term()?;
+
+    game.running = true;
+
+    game.player_dijk.generate_fill();
+    //println!("{:?}", game.player_dijk.current_generation);
+
+    while game.running {
+        if is_event_availble()? {
+            game.handle_input(read()?);
+        }
+    }
 
     Ok(())
 }
@@ -256,7 +255,8 @@ impl GameState {
         };
         
         self.player_dijk.influences = vec![col_influence, player_influence];
-        self.player_dijk.generate();
+        //self.player_dijk.generate();
+        self.player_dijk.generate_fill();
     }
 
     fn test_movement(&mut self) {
