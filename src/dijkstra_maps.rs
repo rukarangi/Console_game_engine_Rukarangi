@@ -63,6 +63,75 @@ impl DijkstraMap {
         }
     }
 
+    pub fn new_implementation(&mut self) {
+        self.current_generation = vec![vec![u32::MAX - 1; self.dimensions.1]; self.dimensions.0];
+
+        self.apply_influences();
+
+        let mut queue: VecDeque<Dimemsion> = VecDeque::new();
+        let mut covered: Vec<Vec<u32>> = vec![vec![u32::MAX; self.dimensions.1 as usize]; self.dimensions.0 as usize];
+
+        let mut done: Vec<Vec<bool>> = vec![vec![false; self.dimensions.1 as usize]; self.dimensions.0 as usize];
+
+        for influence in &self.influences {
+            if influence.value > 100 { continue; }
+            
+            let start = influence.position;
+
+            queue.push_back(start);
+            done[start.0 as usize][start.1 as usize] = true;
+        }
+
+        while queue.len() > 0 {
+            let target = match queue.pop_front() {
+                Some(x) => x,
+                None => break,
+            };
+
+            //println!("Target: {:?}", target);
+
+            let target_value = self.current_generation[target.0 as usize][target.1 as usize];
+
+            let mut lowest: u32 = self.get_neighbours(target).1;
+
+            for neighbour in self.get_neighbours(target).0 {
+                let position = (neighbour.0.0 as usize, neighbour.0.1 as usize);
+
+                if self.current_generation[position.0][position.1] > u32::MAX - 1 || done[position.0][position.1] {
+                    continue;
+                } else {
+                    queue.push_back(neighbour.0);
+                    done[position.0][position.1] = true;
+                    self.current_generation[position.0][position.1] = 1 + target_value; 
+
+                }
+            }
+        }
+    }
+
+    fn get_neighbours(&self, target: Dimemsion) -> (Vec<(Dimemsion, u32)>, u32) {
+        let mut neighbours = Vec::new();
+        let four_dir = vec![(0, 1), (1, 0), (1, 2), (2, 1)];
+
+        let mut lowest: u32 = u32::MAX;
+
+        for dir in &four_dir {
+            let location = (target.0 + dir.0 - 1, target.1 + dir.1 - 1);
+            let value = self.current_generation[location.0 as usize][location.1 as usize];
+            if value < lowest {
+                lowest = value;
+            }
+            if value == u32::MAX {
+                continue;
+            }
+            neighbours.push((location, value));
+        }
+
+        //println!("{:?}", neighbours);
+
+        return (neighbours, lowest);
+    }
+
     pub fn generate_fill(&mut self) {
         self.current_generation = vec![vec![u32::MAX - 2; self.dimensions.1 as usize]; self.dimensions.0 as usize];
         self.apply_influences();

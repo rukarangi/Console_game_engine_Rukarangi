@@ -256,7 +256,8 @@ impl GameState {
         
         self.player_dijk.influences = vec![col_influence, player_influence];
         //self.player_dijk.generate();
-        self.player_dijk.generate_fill();
+        //self.player_dijk.generate_fill();
+        self.player_dijk.new_implementation();
     }
 
     fn test_movement(&mut self) {
