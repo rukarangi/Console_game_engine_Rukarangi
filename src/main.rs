@@ -101,12 +101,14 @@ fn main() -> Result<()> {
     let mut game: GameState = GameState::new(dimensions, view_port, style_map);
 
     let random_map = false;
+    let test_collison = false;
+    let test_dijk = false;
 
-    game.init_player((20, 20));
+    game.init_player((5, 5));
     game.init_test_enemy((22, 18));
 
     if random_map {
-        game.init_map(0.5); // 0.5 is good
+        game.init_map(0.45); // 0.5 is good
     } else {
         game.init_borders();
         game.init_background();
@@ -120,56 +122,50 @@ fn main() -> Result<()> {
 
         game.handle_collision();
         game.handle_movement();
+        game.test_influences();
         game.handle_enemy_energy_move();
         game.handle_render();
         game.renderer.render()?;
         
     }
 
-    game.running = true;
+    if test_collison {    
+        game.running = true;
 
-    while game.running {
-        if is_event_availble()? {
-            game.handle_input(read()?);
+        while game.running {
+            if is_event_availble()? {
+                game.handle_input(read()?);
+            }
+
+            game.handle_collision();
+
+            game.renderer.insert_matrix((0, 0), &game.collision_buffer);
+            game.renderer.render()?;
         }
-
-        game.handle_collision();
-
-        game.renderer.insert_matrix((0, 0), &game.collision_buffer);
-        game.renderer.render()?;
     }
 
-    game.running = true;
+    if test_dijk{
+        game.running =  true;
 
-    game.test_influences();
+        game.test_influences();
 
-    while game.running {
-        if is_event_availble()? {
-            game.test_influences();
-            game.handle_input(read()?);
+        while game.running {
+            if is_event_availble()? {
+                game.test_influences();
+                game.handle_input(read()?);
+            }
+
+            game.handle_collision();
+            game.handle_movement();
+
+            
+            //game.renderer.
+            game.renderer.insert_matrix((0, 0), &game.player_dijk.make_render());
+            game.renderer.render()?;
         }
-
-        game.handle_collision();
-        game.handle_movement();
-
-        
-        //game.renderer.
-        game.renderer.insert_matrix((0, 0), &game.player_dijk.make_render());
-        game.renderer.render()?;
     }
 
     Renderer::reset_term()?;
-
-    game.running = true;
-
-    game.player_dijk.generate_fill();
-    //println!("{:?}", game.player_dijk.current_generation);
-
-    while game.running {
-        if is_event_availble()? {
-            game.handle_input(read()?);
-        }
-    }
 
     Ok(())
 }
@@ -378,8 +374,6 @@ impl GameState {
             if comp.energy >= 10 {
                 match ai_type {
                     AIType::SimpleDown => {
-                        //move_comp.move_desired(Direction::Down);
-                        //comp.energy -= 10;
                         match simple_down(render_comp.position_tl, &self.collision_buffer) {
                             (Action::DoNothing, x) => {
                                 comp.energy -= x;
@@ -395,6 +389,18 @@ impl GameState {
                         move_comp.move_desired(Direction::Left);
                         comp.energy -= 10;
                     },
+                    AIType::RollDownPlayer => {
+                        match roll_down_player(render_comp.position_tl, &self.collision_buffer, &self.player_dijk.current_generation) {
+                            (Action::DoNothing, x) => {
+                                comp.energy -= x;
+                            },
+                            (Action::Move(dir), x) => {
+                                move_comp.move_desired(dir);
+                                comp.energy -= x;
+                            },
+                            _ => continue,
+                        }
+                    }
                     _ => continue,
                 }
             }
@@ -515,7 +521,7 @@ impl GameState {
         let movement_comp = MovementComponent::new(position);
         let collision_comp = CollisionComponent::new(position, get_matrix(position, position, 1), 0);
         let energy_comp = EnergyComponent::new(0);
-        let enemy_ai_comp = EnemyAIComponent::new(AIType::SimpleLeft);
+        let enemy_ai_comp = EnemyAIComponent::new(AIType::RollDownPlayer);
 
         self.render_components.set(entity, render_comp);
         self.movement_components.set(entity, movement_comp);

@@ -85,7 +85,7 @@ pub struct MovementComponent {
     pub desired_position: (u16, u16),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy)]
 pub enum Direction {
     Up,
     Down,
