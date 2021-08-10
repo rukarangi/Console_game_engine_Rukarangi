@@ -102,10 +102,12 @@ fn main() -> Result<()> {
 
     let random_map = false;
     let test_collison = false;
-    let test_dijk = false;
+    let test_dijk = true;
 
     game.init_player((5, 5));
     game.init_test_enemy((22, 18));
+    game.init_test_enemy((40, 40));
+    game.init_test_enemy((22, 15));
 
     if random_map {
         game.init_map(0.45); // 0.5 is good
@@ -249,8 +251,15 @@ impl GameState {
             matrix: vec![vec![1]],
             value: 0,
         };
+        let player_influence_2: Influence = Influence {
+            position: (comp.position_tl.0 + 5, comp.position_tl.1 + 5),
+            matrix: vec![
+                vec![1;4],
+            ],
+            value: 0,
+        };
         
-        self.player_dijk.influences = vec![col_influence, player_influence];
+        self.player_dijk.influences = vec![col_influence, player_influence, player_influence_2];
         //self.player_dijk.generate();
         //self.player_dijk.generate_fill();
         self.player_dijk.new_implementation();
