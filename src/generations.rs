@@ -1,5 +1,3 @@
-use std::fmt;
-
 #[derive(Copy, Clone, Debug)]
 pub struct GenerationalIndex {
     pub index: usize,
@@ -137,7 +135,7 @@ impl<T> GenerationalIndexArray<T> {
         
         if index.index >= self.0.len() {
             let difference = index.index - self.0.len();
-            for i in 0..(difference + 1) {
+            for _i in 0..(difference + 1) {
                 self.0.push(None);
             }
         }

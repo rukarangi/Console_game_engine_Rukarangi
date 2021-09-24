@@ -1,17 +1,13 @@
-use std::io::{stdout, Write};
-use std::time::Duration;
+use std::io::{stdout};
 
 use crossterm::{
     execute,
     style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor,
-    Stylize, StyledContent},
-    ExecutableCommand, Result,
-    event, 
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, SetSize, size,
+    StyledContent},
+    Result,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, SetSize,
     disable_raw_mode, enable_raw_mode, Clear, ClearType::{All}},
-    event::{read, Event, poll, KeyCode},
-    cursor::{MoveUp, MoveDown, MoveLeft, MoveRight,
-    MoveToColumn, MoveToRow, position, Hide, Show},
+    cursor::{MoveToColumn, MoveToRow, Hide, Show},
 };
 
 pub type Dimemsion = (u16, u16);

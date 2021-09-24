@@ -1,22 +1,14 @@
 use std::time::Duration;
-use std::io::{stdout, Write};
+//use std::io::{stdout, Write};
 
 use crossterm::{
-    execute,
-    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor,
-    Stylize, StyledContent},
-    ExecutableCommand, Result,
-    event, 
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, SetSize, size,
-    disable_raw_mode, enable_raw_mode, Clear, ClearType::{All}},
+    style::{Color, Stylize}, 
+    Result,
     event::{read, Event, poll, KeyCode},
-    cursor::{MoveUp, MoveDown, MoveLeft, MoveRight,
-    MoveToColumn, MoveToRow, position, Hide, Show},
 };
 
 mod generations;
-use crate::generations::GenerationalIndex;
-use crate::generations::GenerationalIndexAllocator;
+use crate::generations::*;
 mod renderer;
 use crate::renderer::*;
 mod components;
@@ -100,7 +92,7 @@ fn main() -> Result<()> {
 
     let mut game: GameState = GameState::new(dimensions, view_port, style_map);
 
-    let random_map = false;
+    let random_map = true;
     let test_collison = false;
     let test_dijk = true;
 
@@ -179,7 +171,7 @@ struct GameState {
     player_dijk: DijkstraMap,
     running: bool,
     empty_buffer: Buffer,
-    map_generator: MapGenerator,
+    map_generator: CaveMapGenerator,
 
     // ECS
     entity_allocator: GenerationalIndexAllocator,
@@ -204,7 +196,7 @@ impl GameState {
         let collision_buffer = renderer.input_buffer.clone();
         let player_dijk = DijkstraMap::new(dimensions, Vec::new());
         let empty_buffer = renderer.input_buffer.clone();
-        let map_generator = MapGenerator::new(dimensions);
+        let map_generator = CaveMapGenerator::new(dimensions);
         
         // ECS
         let entity_allocator = generations::GenerationalIndexAllocator::new(1);
@@ -231,6 +223,7 @@ impl GameState {
         }
     }
 
+
     fn test_influences(&mut self) {
         let player = match self.player {
             Some(e) => e,
@@ -251,7 +244,7 @@ impl GameState {
             matrix: vec![vec![1]],
             value: 0,
         };
-        let player_influence_2: Influence = Influence {
+        let _player_influence_2: Influence = Influence {
             position: (comp.position_tl.0 + 5, comp.position_tl.1 + 5),
             matrix: vec![
                 vec![1;4],
@@ -259,24 +252,8 @@ impl GameState {
             value: 0,
         };
         
-        self.player_dijk.influences = vec![col_influence, player_influence, player_influence_2];
-        //self.player_dijk.generate();
-        //self.player_dijk.generate_fill();
+        self.player_dijk.influences = vec![col_influence, player_influence];
         self.player_dijk.new_implementation();
-    }
-
-    fn test_movement(&mut self) {
-        match self.player {
-            Some(player_entity) => {
-                match self.movement_components.get_mut(player_entity) {
-                    Some(component) => {
-                        component.move_desired(Direction::Right);
-                    }
-                    None => panic!("No movement comp on player!"),
-                }
-            },
-            None => panic!("No player!"),
-        }
     }
 
     fn move_entity(&mut self, entity: Entity, direction: Direction) {
@@ -299,19 +276,19 @@ impl GameState {
                     KeyCode::Char('q') => self.running = false,
                     KeyCode::Right => {
                         self.move_entity(player, Direction::Right);
-                        self.add_ten_energy();
+                        self.add_energy(10);
                     },
                     KeyCode::Left => {
                         self.move_entity(player, Direction::Left);
-                        self.add_ten_energy();
+                        self.add_energy(10);
                     },
                     KeyCode::Up => {
                         self.move_entity(player, Direction::Up);
-                        self.add_ten_energy();
+                        self.add_energy(10);
                     },
                     KeyCode::Down => {
                         self.move_entity(player, Direction::Down);
-                        self.add_ten_energy();
+                        self.add_energy(10);
                     },
                     _ => return,
                 }
@@ -320,14 +297,14 @@ impl GameState {
         }
     }
 
-    fn add_ten_energy(&mut self) {
+    fn add_energy(&mut self, ammount: u8) {
         for gen_index in self.entity_allocator.get_vec() {
             let comp = match self.energy_components.get_mut(gen_index) {
                 Some(comp) => comp,
                 None => continue,
             };
 
-            comp.energy += 10;
+            comp.energy += ammount;
         }
     }
 
@@ -391,7 +368,6 @@ impl GameState {
                                 move_comp.move_desired(dir);
                                 comp.energy -= x;
                             },
-                            _ => continue,
                         }
                     },
                     AIType::SimpleLeft => {
@@ -405,12 +381,11 @@ impl GameState {
                             },
                             (Action::Move(dir), x) => {
                                 move_comp.move_desired(dir);
+                                //self.move_entity(gen_index, dir);
                                 comp.energy -= x;
                             },
-                            _ => continue,
                         }
                     }
-                    _ => continue,
                 }
             }
         }
@@ -436,8 +411,8 @@ impl GameState {
                         continue;
                     }
 
-                    let dif_x = 0;
-                    let dif_y = 0;
+                    //let dif_x = 0; not in use
+                    //let dif_y = 0;
                     
                     render_comp.backgroud = self.renderer.input_buffer[desired_x as usize][desired_y as usize];// + render_comp.character;
                     render_comp.position_tl = (desired_x, desired_y);
@@ -538,7 +513,6 @@ impl GameState {
         self.energy_components.set(entity, energy_comp);
         self.enemy_ai_components.set(entity, enemy_ai_comp);
     }
-
     
     fn init_borders(&mut self) {
         let top = ((1, 1), (self.renderer.view_port.0, 1));
@@ -562,9 +536,6 @@ impl GameState {
     }
 
     fn init_field(&mut self) {
-        let field: Vec<Vec<u8>> = vec![
-            vec![0; 20],
-        ];
         let entity = self.entity_allocator.allocate();
 
         let render_comp = RenderComponent::new(0, 5, (50, 10), get_matrix((50, 10), (70, 30), 1), 1);

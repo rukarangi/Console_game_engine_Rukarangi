@@ -1,4 +1,3 @@
-use std::default::Default;
 use crate::renderer::Buffer;
 
 #[derive(Clone, Debug)]

@@ -1,8 +1,12 @@
-use core::fmt::Error;
 use std::collections::VecDeque;
 
 use crate::renderer::Buffer;
 use crate::renderer::Dimemsion;
+
+/*
+IDEAS - 
+ * redo to just do once over
+*/
 
 pub struct Influence {
     pub position: Dimemsion,
@@ -62,9 +66,7 @@ impl DijkstraMap {
         self.apply_influences();
 
         let mut queue: VecDeque<Dimemsion> = VecDeque::new();
-        let mut covered: Vec<Vec<u32>> = vec![vec![u32::MAX; self.dimensions.1 as usize]; self.dimensions.0 as usize];
-
-        let mut done: Vec<Vec<bool>> = vec![vec![false; self.dimensions.1 as usize]; self.dimensions.0 as usize];
+        let mut done: Vec<Vec<bool>>; //vec![vec![false; self.dimensions.1 as usize]; self.dimensions.0 as usize];
 
         let mut zero_positions: Vec<Dimemsion> = Vec::new();
 
@@ -78,15 +80,10 @@ impl DijkstraMap {
                 for (y, val) in col.iter().enumerate() {
                     if *val == 1 {
                         let position = (start.0 + x as u16, start.1 + y as u16);
-                        //queue.push_back(posiiton);
-                        //done[start.0 as usize][start.1 as usize] = true;
                         zero_positions.push(position);
                     }
                 }
             }
-
-            //queue.push_back(start);
-            //done[start.0 as usize][start.1 as usize] = true;
         }   
 
         for position in zero_positions.clone() {
@@ -106,8 +103,6 @@ impl DijkstraMap {
                 
                 let target_value = self.current_generation[target.0 as usize][target.1 as usize];
     
-                let mut lowest: u32 = self.get_neighbours(target).1;
-    
                 for neighbour in self.get_neighbours(target).0 {
                     let position = (neighbour.0.0 as usize, neighbour.0.1 as usize);
     
@@ -116,38 +111,14 @@ impl DijkstraMap {
                     } else {
                         queue.push_back(neighbour.0);
                         done[position.0][position.1] = true;
-                        if self.current_generation[position.0][position.1] < 1+ target_value {
+                        if self.current_generation[position.0][position.1] < 1 + target_value {
                             continue;
                         }
                         self.current_generation[position.0][position.1] = 1 + target_value; 
                     }
                 }
             }
-        } 
-
-        /*while queue.len() > 0 //{
-            let target = match queue.pop_front() {
-                Some(x) => x,
-                None => break,
-            };
-
-            let target_value = self.current_generation[target.0 as usize][target.1 as usize];
-
-            let mut lowest: u32 = self.get_neighbours(target).1;
-
-            for neighbour in self.get_neighbours(target).0 {
-                let position = (neighbour.0.0 as usize, neighbour.0.1 as usize);
-
-                if self.current_generation[position.0][position.1] > u32::MAX - 1 || done[position.0][position.1] {
-                    continue;
-                } else {
-                    queue.push_back(neighbour.0);
-                    done[position.0][position.1] = true;
-                    self.current_generation[position.0][position.1] = 1 + target_value; 
-
-                }
-            }
-        }*/
+        }
     }
 
     fn get_neighbours(&self, target: Dimemsion) -> (Vec<(Dimemsion, u32)>, u32) {

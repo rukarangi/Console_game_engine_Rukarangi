@@ -64,7 +64,7 @@ fn lowest_direction(target: (u16, u16), dijk: &Vec<Vec<u32>>) -> Option<((u16, u
         .map(|(i, x)| (i, dijk[(x.0 + target.0 - 1) as usize][(x.1 + target.1 - 1) as usize]))
         .collect();
 
-    for (i, x) in four_values.iter() {
+    for (_, x) in four_values.iter() {
         if lowest > *x {
             lowest = *x;
         }
@@ -83,7 +83,7 @@ fn lowest_direction(target: (u16, u16), dijk: &Vec<Vec<u32>>) -> Option<((u16, u
             let random_idx = rng.gen_range(0..equal_lowest.len());
 
             return Some(
-                ((four_pos[equal_lowest[random_idx].0], four_dir[equal_lowest[random_idx].0]))
+                (four_pos[equal_lowest[random_idx].0], four_dir[equal_lowest[random_idx].0])
             );
         },
         _ => return None,
